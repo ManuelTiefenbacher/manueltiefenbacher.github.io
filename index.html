@@ -11,53 +11,85 @@
 </head>
 <body>
   <h1>Strava Distance Over Time</h1>
+  
+  <!-- Dropdown for file selection -->
+  <select id="fileSelect" onchange="loadFileData()">
+    <option value="">Select a file...</option>
+    <!-- Options will be populated by JavaScript -->
+  </select>
+  
   <canvas id="distanceChart"></canvas>
 
   <script>
-    const apiUrl = 'https://strava.manueltiefenbacher998.workers.dev';
+    const workerUrl = 'https://your-worker-url'; // Use the correct worker URL
 
-    fetch(apiUrl)
+    // Fetch the list of available files from the worker
+    fetch(workerUrl)
       .then(response => response.json())
-      .then(data => {
-        // Sort by date
-        data.sort((a, b) => new Date(a.start_date_local) - new Date(b.start_date_local));
-
-        const labels = data.map(act => new Date(act.start_date_local).toLocaleDateString());
-        const distances = data.map(act => act.distance / 1000); // convert meters to km
-
-        const ctx = document.getElementById('distanceChart').getContext('2d');
-        new Chart(ctx, {
-          type: 'line',
-          data: {
-            labels: labels,
-            datasets: [{
-              label: 'Distance (km)',
-              data: distances,
-              borderColor: 'rgb(75, 192, 192)',
-              backgroundColor: 'rgba(75, 192, 192, 0.2)',
-              tension: 0.2,
-              fill: true,
-              pointRadius: 3,
-              pointHoverRadius: 5
-            }]
-          },
-          options: {
-            scales: {
-              y: {
-                beginAtZero: true,
-                title: { display: true, text: 'Distance (km)' }
-              },
-              x: {
-                title: { display: true, text: 'Date' }
-              }
-            }
-          }
+      .then(files => {
+        const select = document.getElementById('fileSelect');
+        files.forEach(file => {
+          const option = document.createElement('option');
+          option.value = file;
+          option.textContent = file;
+          select.appendChild(option);
         });
       })
       .catch(err => {
-        document.body.innerHTML += '<p style="color:red;">Failed to load chart data.</p>';
+        document.body.innerHTML += '<p style="color:red;">Failed to load file list from worker.</p>';
         console.error(err);
       });
+
+    // Function to load the selected file and render chart
+    function loadFileData() {
+      const selectedFile = document.getElementById('fileSelect').value;
+      if (!selectedFile) return; // Do nothing if no file is selected
+      
+      const apiUrl = `${workerUrl}?file=${selectedFile}`;
+      
+      fetch(apiUrl)
+        .then(response => response.json())
+        .then(data => {
+          // Sort data by date
+          data.sort((a, b) => new Date(a.start_date_local) - new Date(b.start_date_local));
+
+          const labels = data.map(act => new Date(act.start_date_local).toLocaleDateString());
+          const distances = data.map(act => act.distance / 1000); // Convert meters to km
+
+          const ctx = document.getElementById('distanceChart').getContext('2d');
+          new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: labels,
+              datasets: [{
+                label: 'Distance (km)',
+                data: distances,
+                borderColor: 'rgb(75, 192, 192)',
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                tension: 0.2,
+                fill: true,
+                pointRadius: 3,
+                pointHoverRadius: 5
+              }]
+            },
+            options: {
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  title: { display: true, text: 'Distance (km)' }
+                },
+                x: {
+                  title: { display: true, text: 'Date' }
+                }
+              }
+            }
+          });
+        })
+        .catch(err => {
+          document.body.innerHTML += '<p style="color:red;">Failed to load selected file data.</p>';
+          console.error(err);
+        });
+    }
   </script>
 </body>
 </html>
