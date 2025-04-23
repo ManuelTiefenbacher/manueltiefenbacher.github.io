@@ -1,7 +1,32 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Strava Activities</title>
+</head>
 <body>
-<h1>Hello World</h1>
-<p>I'm hosted with GitHub Pages.</p>
+  <h1>My Strava Activities</h1>
+  <div id="activity-list">Loading...</div>
+
+  <script>
+    const apiUrl = 'https://strava.manueltiefenbacher998.workers.dev'; // your Cloudflare Worker URL
+
+    fetch(apiUrl)
+      .then(response => response.json())
+      .then(data => {
+        const container = document.getElementById('activity-list');
+        container.innerHTML = ''; // Clear "Loading..."
+
+        data.forEach(activity => {
+          const item = document.createElement('div');
+          item.innerHTML = `<strong>${activity.name}</strong>: ${activity.distance / 1000} km`;
+          container.appendChild(item);
+        });
+      })
+      .catch(err => {
+        document.getElementById('activity-list').innerText = 'Failed to load data.';
+        console.error(err);
+      });
+  </script>
 </body>
 </html>
