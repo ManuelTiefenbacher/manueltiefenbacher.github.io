@@ -2,29 +2,60 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Strava Activities</title>
+  <title>Strava Distance Chart</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: sans-serif; text-align: center; margin: 2rem; }
+    canvas { max-width: 800px; margin: auto; }
+  </style>
 </head>
 <body>
-  <h1>My Strava Activities</h1>
-  <div id="activity-list">Loading...</div>
+  <h1>Strava Distance Over Time</h1>
+  <canvas id="distanceChart"></canvas>
 
   <script>
-    const apiUrl = 'https://strava.manueltiefenbacher998.workers.dev'; // your Cloudflare Worker URL
+    const apiUrl = 'https://stravaapi-clean.manueltiefenbacher998.workers.dev';
 
     fetch(apiUrl)
       .then(response => response.json())
       .then(data => {
-        const container = document.getElementById('activity-list');
-        container.innerHTML = ''; // Clear "Loading..."
+        // Sort by date
+        data.sort((a, b) => new Date(a.start_date_local) - new Date(b.start_date_local));
 
-        data.forEach(activity => {
-          const item = document.createElement('div');
-          item.innerHTML = `<strong>${activity.name}</strong>: ${activity.distance / 1000} km`;
-          container.appendChild(item);
+        const labels = data.map(act => new Date(act.start_date_local).toLocaleDateString());
+        const distances = data.map(act => act.distance / 1000); // convert meters to km
+
+        const ctx = document.getElementById('distanceChart').getContext('2d');
+        new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: 'Distance (km)',
+              data: distances,
+              borderColor: 'rgb(75, 192, 192)',
+              backgroundColor: 'rgba(75, 192, 192, 0.2)',
+              tension: 0.2,
+              fill: true,
+              pointRadius: 3,
+              pointHoverRadius: 5
+            }]
+          },
+          options: {
+            scales: {
+              y: {
+                beginAtZero: true,
+                title: { display: true, text: 'Distance (km)' }
+              },
+              x: {
+                title: { display: true, text: 'Date' }
+              }
+            }
+          }
         });
       })
       .catch(err => {
-        document.getElementById('activity-list').innerText = 'Failed to load data.';
+        document.body.innerHTML += '<p style="color:red;">Failed to load chart data.</p>';
         console.error(err);
       });
   </script>
