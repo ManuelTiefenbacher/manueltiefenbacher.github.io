@@ -367,6 +367,10 @@
 	async function loadActivityData() {
 		try {
 			const response = await fetch('2025-04-24_22-16-23_latestActivity.json'); // JSON-Datei laden
+			console.log('Antwortstatus:', response.status);
+			if (!response.ok) {
+			    throw new Error('Netzwerkantwort war nicht ok');
+			}
 			
 			if (!response.ok) {
 				throw new Error('Netzwerkantwort war nicht ok');
