@@ -354,25 +354,22 @@
 				},
 				scales: {
 					x: {
-						type: 'logarithmic', // Time axis is logarithmic
 						ticks: { color: 'white' },
 						grid: { color: '#444' },
-						min: Math.min(...activityData.time.filter(t => t > 0)) || 1, // Avoid 0 on log scale
-						max: Math.max(...activityData.time)
 					},
-					y1: {
-						type: 'linear', // Power axis is linear
+					y: {
+						type: 'linear',
 						position: 'left',
 						title: { display: true, text: 'Power (W)', color: colorSet.power },
 						ticks: {
 							color: colorSet.power,
-							callback: function (value) {
+							callback: function(value) {
 								return value.toLocaleString(); // Format large numbers
 							}
 						},
 						grid: { color: '#444' },
-						min: Math.min(...activityData.power.filter(p => p > 0)) || 1, // Avoid 0
-						max: Math.ceil(Math.max(...activityData.power) * 1.1) // A bit higher than max
+						min: 0,
+						max: Math.ceil(Math.max(...powerValues) * 1.1)
 					}
 				}
 			}
