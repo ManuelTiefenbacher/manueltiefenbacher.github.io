@@ -321,6 +321,15 @@
 	    const sortedPower = sortedData.map(item => item.power);
 	    const sortedTime = sortedData.map(item => item.time);
 	
+	    // Ensure time values are positive (remove zeros or negative)
+	    const validTimes = sortedTime.filter(time => time > 0);
+	    const validPowers = sortedPower.slice(0, validTimes.length); // Sync power data with valid times
+	
+	    if (validTimes.length === 0) {
+	        console.error("No valid time data available for logarithmic scale.");
+	        return;
+	    }
+	
 	    const container = document.getElementById(containerId);
 	    const canvas = document.createElement('canvas');
 	    container.appendChild(canvas);
@@ -328,11 +337,11 @@
 	    new Chart(canvas.getContext('2d'), {
 	        type: 'line',
 	        data: {
-	            labels: sortedTime,
+	            labels: validTimes, // Use valid times for the x-axis
 	            datasets: [
 	                {
 	                    label: 'Power / Time',
-	                    data: sortedPower,
+	                    data: validPowers, // Use the valid power data
 	                    borderColor: colorSet.power,
 	                    backgroundColor: colorSet.power + '33',
 	                    fill: false,
@@ -366,6 +375,8 @@
 	                    type: 'logarithmic', // Set x-axis to logarithmic scale
 	                    ticks: { color: 'white' },
 	                    grid: { color: '#444' },
+	                    min: Math.min(...validTimes), // Ensure time axis starts at a valid minimum value
+	                    max: Math.max(...validTimes) * 1.1 // Allow a little margin at the top
 	                },
 	                y: {
 	                    type: 'linear',
@@ -379,14 +390,12 @@
 	                    },
 	                    grid: { color: '#444' },
 	                    min: 0,
-	                    max: Math.ceil(Math.max(...sortedPower) * 1.1)
+	                    max: Math.ceil(Math.max(...validPowers) * 1.1)
 	                }
 	            }
 	        }
 	    });
 	};
-
-
 
 	async function loadAllActivities() {
 		try {
