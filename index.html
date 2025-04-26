@@ -407,7 +407,7 @@
 			// Check if cadence exists in the data
 			const cadenceData = jsonData.cadence ? jsonData.cadence.data : [];
 			const powerData = jsonData.power ? jsonData.power.data : [];
-			const velocityData = jsonData.velocity_smooth ? jsonData.velocit_smooth : [];
+			const velocityData = jsonData.velocity_smooth ? jsonData.velocity_smooth : [];
 		
 			const time = Array.from({ length: jsonData.distance.data.length }, (_, i) => {
 				const min = String(Math.floor(i / 60)).padStart(2, '0');
