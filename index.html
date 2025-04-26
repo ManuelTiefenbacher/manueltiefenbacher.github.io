@@ -315,7 +315,7 @@
 		const container = document.getElementById(containerId);
 		const canvas = document.createElement('canvas');
 		container.appendChild(canvas);
-
+	
 		new Chart(canvas.getContext('2d'), {
 			type: 'line',
 			data: {
@@ -343,9 +343,9 @@
 						text: activityLabel,
 						color: 'white',
 						font: {
-						    size: 24 // <- This sets the font size (affects "height")
+							size: 24
 						}
-					  },
+					},
 					legend: {
 						labels: {
 							color: 'white'
@@ -360,11 +360,16 @@
 					y1: {
 						type: 'logarithmic',
 						position: 'left',
-						title: { display: true, text: 'Power (km/h)', color: colorSet.power },
-						ticks: { color: colorSet.power },
+						title: { display: true, text: 'Power (W)', color: colorSet.power },
+						ticks: {
+							color: colorSet.power,
+							callback: function (value) {
+								return value.toLocaleString(); // nicely formats big numbers
+							}
+						},
 						grid: { color: '#444' },
-						min: 0,
-						max: Math.ceil(Math.max(...activityData.power) * 4)
+						min: Math.min(...activityData.power.filter(p => p > 0)) || 1, // no 0
+						max: Math.ceil(Math.max(...activityData.power) * 1.1) // just a bit higher
 					}
 				}
 			}
