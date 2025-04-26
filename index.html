@@ -406,7 +406,7 @@
 		
 			const jsonData = await response.json();
 			console.log(jsonData);
-			if (!jsonData.cadence?.data || !jsonData.distance?.data || !jsonData.heartrate?.data) {
+			if (!jsonData.distance?.data || !jsonData.heartrate?.data) {
 				throw new Error('Fehlende Daten in der JSON-Datei');
 			}
 		
