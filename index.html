@@ -322,7 +322,7 @@
 				labels: activityData.time,
 				datasets: [
 					{
-						label: 'Speed (km/h)',
+						label: 'Power / Time',
 						data: activityData.power,
 						borderColor: colorSet.power,
 						backgroundColor: colorSet.power + '33',
@@ -358,6 +358,7 @@
 						grid: { color: '#444' }
 					},
 					y1: {
+						type: 'logarithmic',
 						position: 'left',
 						title: { display: true, text: 'Power (km/h)', color: colorSet.power },
 						ticks: { color: colorSet.power },
