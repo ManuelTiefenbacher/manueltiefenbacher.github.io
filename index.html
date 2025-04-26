@@ -414,7 +414,6 @@
 				const sec = String(i % 60).padStart(2, '0');
 				return `${min}:${sec}`;
 			});
-			console.log(activityData);
 			const activityData = {
 				time: time,
 				speed: jsonData.distance.data,
@@ -422,6 +421,7 @@
 				power: jsonData.distance.data.map(d => d * 0.5),
 				heartRate: jsonData.heartrate.data
 			};
+			console.log(activityData);
 		
 			return activityData;
 		} catch (error) {
