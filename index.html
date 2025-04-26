@@ -312,6 +312,10 @@
 
 	
 	const createPowerChart = (containerId, activityData, activityLabel, colorSet) => {
+	    // Log the original time and power data
+	    console.log("Original Time Data:", activityData.time);
+	    console.log("Original Power Data:", activityData.power);
+	
 	    // Sort power data in decreasing order
 	    const sortedData = activityData.power
 	        .map((value, index) => ({ time: activityData.time[index], power: value }))
@@ -324,6 +328,10 @@
 	    // Ensure time values are positive (remove zeros or negative)
 	    const validTimes = sortedTime.filter(time => time > 0);
 	    const validPowers = sortedPower.slice(0, validTimes.length); // Sync power data with valid times
+	
+	    // Log the filtered valid time and power data
+	    console.log("Filtered Valid Time Data:", validTimes);
+	    console.log("Filtered Valid Power Data:", validPowers);
 	
 	    if (validTimes.length === 0) {
 	        console.error("No valid time data available for logarithmic scale.");
