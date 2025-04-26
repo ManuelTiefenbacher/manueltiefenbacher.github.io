@@ -432,21 +432,29 @@
 		heartRate: '#f44336'
 	};
 
-	// Asynchrone Funktion, um die Daten zu laden und das Diagramm zu erstellen
 	async function initializeChart() {
-		const activityData = await loadActivityData(); // Lade die Daten
-
-		if (activityData) { // Stelle sicher, dass die Daten vorhanden sind
-			createActivityChart('outdoorActivityChartContainer', activityData, 'Latest Ride', colorSet);
-			createPowerChart('powerChartContainer', activityData, 'PowerChart', colorSet);
-		} else {
-			console.error('Keine Aktivitätsdaten verfügbar.');
+		try {
+			const listResponse = await fetch('https://strava.manueltiefenbacher998.workers.dev/');
+			const fileNames = await listResponse.json();
+			if (fileNames.length === 0) {
+				console.error('Keine Dateien gefunden.');
+				return;
+			}
+			const latestFile = fileNames[0]; // Oder sortieren, je nachdem wie deine API antwortet
+	
+			const activityData = await loadActivityData(latestFile);
+			if (activityData) {
+				createActivityChart('outdoorActivityChartContainer', activityData, 'Latest Ride', colorSet);
+				createPowerChart('powerChartContainer', activityData, 'PowerChart', colorSet);
+			}
+		} catch (error) {
+			console.error('Fehler beim Initialisieren:', error);
 		}
 	}
 
 	// Starte den Prozess
 	initializeChart();
-	//loadAllActivities()
+	loadAllActivities()
 
     createRankingSection('outdoorRanking', 'Outdoor Rankings', [
       { label: 'Top 3 Outdoor Rides - Last 4 Weeks', entries: ['Ride A - 67 km', 'Ride B - 59 km', 'Ride C - 55 km'] },
