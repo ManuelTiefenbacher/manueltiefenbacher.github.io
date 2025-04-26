@@ -410,7 +410,7 @@
 				throw new Error('Fehlende Daten in der JSON-Datei');
 			}
 		
-			const time = Array.from({ length: jsonData.cadence.data.length }, (_, i) => {
+			const time = Array.from({ length: jsonData.distance.data.length }, (_, i) => {
 				const min = String(Math.floor(i / 60)).padStart(2, '0');
 				const sec = String(i % 60).padStart(2, '0');
 				return `${min}:${sec}`;
