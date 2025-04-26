@@ -312,28 +312,29 @@
 
 	
 	const createPowerChart = (containerId, activityData, activityLabel, colorSet) => {
-	    // Log the original time and power data
-	    console.log("Original Time Data:", activityData.time);
-	    console.log("Original Power Data:", activityData.power);
+	    // Convert time strings (e.g., '00:00') to total seconds
+	    const convertTimeToSeconds = (timeString) => {
+	        const [minutes, seconds] = timeString.split(':').map(Number);
+	        return minutes * 60 + seconds;
+	    };
 	
-	    // Sort power data in decreasing order
+	    // Convert all time values to seconds
+	    const timeInSeconds = activityData.time.map(convertTimeToSeconds);
+	
+	    // Sort power data in decreasing order based on the power values
 	    const sortedData = activityData.power
-	        .map((value, index) => ({ time: activityData.time[index], power: value }))
+	        .map((value, index) => ({ time: timeInSeconds[index], power: value }))
 	        .sort((a, b) => b.power - a.power); // Sort in descending order
 	
-	    // Separate sorted power and time
+	    // Separate sorted power and time (in seconds)
 	    const sortedPower = sortedData.map(item => item.power);
 	    const sortedTime = sortedData.map(item => item.time);
 	
-	    // Ensure time values are positive (remove zeros or negative)
-	    const validTimes = sortedTime.filter(time => time > 0);
-	    const validPowers = sortedPower.slice(0, validTimes.length); // Sync power data with valid times
+	    // Log the converted and sorted data for debugging
+	    console.log("Converted and Sorted Time Data (in seconds):", sortedTime);
+	    console.log("Converted and Sorted Power Data:", sortedPower);
 	
-	    // Log the filtered valid time and power data
-	    console.log("Filtered Valid Time Data:", validTimes);
-	    console.log("Filtered Valid Power Data:", validPowers);
-	
-	    if (validTimes.length === 0) {
+	    if (sortedTime.length === 0) {
 	        console.error("No valid time data available for logarithmic scale.");
 	        return;
 	    }
@@ -345,11 +346,11 @@
 	    new Chart(canvas.getContext('2d'), {
 	        type: 'line',
 	        data: {
-	            labels: validTimes, // Use valid times for the x-axis
+	            labels: sortedTime, // Use time in seconds for the x-axis
 	            datasets: [
 	                {
 	                    label: 'Power / Time',
-	                    data: validPowers, // Use the valid power data
+	                    data: sortedPower, // Use the sorted power data
 	                    borderColor: colorSet.power,
 	                    backgroundColor: colorSet.power + '33',
 	                    fill: false,
@@ -383,8 +384,8 @@
 	                    type: 'logarithmic', // Set x-axis to logarithmic scale
 	                    ticks: { color: 'white' },
 	                    grid: { color: '#444' },
-	                    min: Math.min(...validTimes), // Ensure time axis starts at a valid minimum value
-	                    max: Math.max(...validTimes) * 1.1 // Allow a little margin at the top
+	                    min: Math.min(...sortedTime), // Ensure time axis starts at a valid minimum value
+	                    max: Math.max(...sortedTime) * 1.1 // Allow a little margin at the top
 	                },
 	                y: {
 	                    type: 'linear',
@@ -398,7 +399,7 @@
 	                    },
 	                    grid: { color: '#444' },
 	                    min: 0,
-	                    max: Math.ceil(Math.max(...validPowers) * 1.1)
+	                    max: Math.ceil(Math.max(...sortedPower) * 1.1)
 	                }
 	            }
 	        }
