@@ -321,18 +321,38 @@
 	    // Convert all time values to seconds
 	    const timeInSeconds = activityData.time.map(convertTimeToSeconds);
 	
-	    // Sort power data in decreasing order based on the power values
-	    const sortedData = activityData.power
-	        .map((value, index) => ({ time: timeInSeconds[index], power: value }))
+	    // Combine time and power data into an array of objects
+	    const combinedData = timeInSeconds.map((time, index) => ({
+	        time: time,
+	        power: activityData.power[index]
+	    }));
+	
+	    // Aggregate power values by time (e.g., calculate average power for each time)
+	    const aggregatedData = combinedData.reduce((acc, { time, power }) => {
+	        if (!acc[time]) {
+	            acc[time] = { totalPower: 0, count: 0 };
+	        }
+	        acc[time].totalPower += power;
+	        acc[time].count += 1;
+	        return acc;
+	    }, {});
+	
+	    // Prepare the aggregated data: average power for each unique time
+	    const aggregatedTime = Object.keys(aggregatedData).map(time => parseInt(time));
+	    const aggregatedPower = aggregatedTime.map(time => aggregatedData[time].totalPower / aggregatedData[time].count);
+	
+	    // Sort by power (in decreasing order)
+	    const sortedData = aggregatedTime
+	        .map((time, index) => ({ time, power: aggregatedPower[index] }))
 	        .sort((a, b) => b.power - a.power); // Sort in descending order
 	
-	    // Separate sorted power and time (in seconds)
-	    const sortedPower = sortedData.map(item => item.power);
+	    // Separate sorted time and power
 	    const sortedTime = sortedData.map(item => item.time);
+	    const sortedPower = sortedData.map(item => item.power);
 	
-	    // Log the converted and sorted data for debugging
-	    console.log("Converted and Sorted Time Data (in seconds):", sortedTime);
-	    console.log("Converted and Sorted Power Data:", sortedPower);
+	    // Log the aggregated and sorted data for debugging
+	    console.log("Aggregated and Sorted Time Data (in seconds):", sortedTime);
+	    console.log("Aggregated and Sorted Power Data:", sortedPower);
 	
 	    if (sortedTime.length === 0) {
 	        console.error("No valid time data available for logarithmic scale.");
@@ -406,6 +426,7 @@
 	    });
 	};
 
+
 	async function loadAllActivities() {
 		try {
 			// 1. Fetch the list of activity files from your Cloudflare Worker
@@ -457,7 +478,7 @@
 				power: powerData,
 				heartRate: jsonData.heartrate.data
 			};
-			console.log(activityData);
+			//console.log(activityData);
 		
 			return activityData;
 		} catch (error) {
