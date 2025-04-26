@@ -312,69 +312,80 @@
 
 	
 	const createPowerChart = (containerId, activityData, activityLabel, colorSet) => {
-		const container = document.getElementById(containerId);
-		const canvas = document.createElement('canvas');
-		container.appendChild(canvas);
+	    // Sort power data in decreasing order
+	    const sortedData = activityData.power
+	        .map((value, index) => ({ time: activityData.time[index], power: value }))
+	        .sort((a, b) => b.power - a.power); // Sort in descending order
 	
-		new Chart(canvas.getContext('2d'), {
-			type: 'line',
-			data: {
-				labels: activityData.time,
-				datasets: [
-					{
-						label: 'Power / Time',
-						data: activityData.power,
-						borderColor: colorSet.power,
-						backgroundColor: colorSet.power + '33',
-						fill: false,
-						tension: 0.3,
-						yAxisID: 'y1',
-						pointRadius: 0.3,
-						borderWidth: 1,
-						borderDash: [5, 5]
-					}
-				]
-			},
-			options: {
-				responsive: true,
-				plugins: {
-					title: {
-						display: true,
-						text: activityLabel,
-						color: 'white',
-						font: {
-							size: 24
-						}
-					},
-					legend: {
-						labels: {
-							color: 'white'
-						}
-					}
-				},
-				scales: {
-					x: {
-						ticks: { color: 'white' },
-						grid: { color: '#444' },
-					},
-					y: {
-						type: 'linear',
-						position: 'left',
-						title: { display: true, text: 'Power (W)', color: colorSet.power },
-						ticks: {
-							color: colorSet.power,
-							callback: function(value) {
-								return value.toLocaleString(); // Format large numbers
-							}
-						},
-						grid: { color: '#444' },
-						min: 0,
-						max: Math.ceil(Math.max(...activityData.power) * 1.1)
-					}
-				}
-			}
-		});
+	    // Separate sorted power and time
+	    const sortedPower = sortedData.map(item => item.power);
+	    const sortedTime = sortedData.map(item => item.time);
+	
+	    const container = document.getElementById(containerId);
+	    const canvas = document.createElement('canvas');
+	    container.appendChild(canvas);
+	
+	    new Chart(canvas.getContext('2d'), {
+	        type: 'line',
+	        data: {
+	            labels: sortedTime,
+	            datasets: [
+	                {
+	                    label: 'Power / Time',
+	                    data: sortedPower,
+	                    borderColor: colorSet.power,
+	                    backgroundColor: colorSet.power + '33',
+	                    fill: false,
+	                    tension: 0.3,
+	                    yAxisID: 'y1',
+	                    pointRadius: 0.3,
+	                    borderWidth: 1,
+	                    borderDash: [5, 5]
+	                }
+	            ]
+	        },
+	        options: {
+	            responsive: true,
+	            plugins: {
+	                title: {
+	                    display: true,
+	                    text: activityLabel,
+	                    color: 'white',
+	                    font: {
+	                        size: 24
+	                    }
+	                },
+	                legend: {
+	                    labels: {
+	                        color: 'white'
+	                    }
+	                }
+	            },
+	            scales: {
+	                x: {
+	                    type: 'logarithmic', // Set x-axis to logarithmic scale
+	                    ticks: { color: 'white' },
+	                    grid: { color: '#444' },
+	                },
+	                y: {
+	                    type: 'linear',
+	                    position: 'left',
+	                    title: { display: true, text: 'Power (W)', color: colorSet.power },
+	                    ticks: {
+	                        color: colorSet.power,
+	                        callback: function(value) {
+	                            return value.toLocaleString(); // Format large numbers
+	                        }
+	                    },
+	                    grid: { color: '#444' },
+	                    min: 0,
+	                    max: Math.ceil(Math.max(...sortedPower) * 1.1)
+	                }
+	            }
+	        }
+	    });
 	};
+
 
 
 	async function loadAllActivities() {
