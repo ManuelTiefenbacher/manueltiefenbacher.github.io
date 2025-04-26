@@ -396,6 +396,7 @@
 	  
 	async function loadActivityData(fileName) {
 		try {
+			if (!fileName) throw new Error('Ungültiger Dateiname');
 			const response = await fetch(`https://strava.manueltiefenbacher998.workers.dev/?file=${fileName}`);
 			
 			if (!response.ok) {
@@ -403,6 +404,9 @@
 			}
 		
 			const jsonData = await response.json();
+			if (!jsonData.cadence?.data || !jsonData.distance?.data || !jsonData.heartrate?.data) {
+				throw new Error('Fehlende Daten in der JSON-Datei');
+			}
 		
 			const time = Array.from({ length: jsonData.cadence.data.length }, (_, i) => {
 				const min = String(Math.floor(i / 60)).padStart(2, '0');
