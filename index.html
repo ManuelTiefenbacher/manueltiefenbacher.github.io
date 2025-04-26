@@ -406,7 +406,7 @@
 			const jsonData = await response.json();
 			// Check if cadence exists in the data
 			const cadenceData = jsonData.cadence ? jsonData.cadence.data : [];
-			const powerData = jsonData.power ? jsonData.power.data : [];
+			const powerData = jsonData.watts ? jsonData.watts.data : [];
 			const velocityData = jsonData.velocity_smooth ? jsonData.velocity_smooth.data : [];
 		
 			const time = Array.from({ length: jsonData.distance.data.length }, (_, i) => {
