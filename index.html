@@ -312,82 +312,82 @@
 
 	
 	const createPowerChart = (containerId, activityData, activityLabel, colorSet) => {
-	    // Sort power values in decreasing order
-	    const sortedPower = [...activityData.power].sort((a, b) => b - a);
-	
-	    // Generate index-based x-axis (representing "rank" of each power value)
-	    const sortedIndex = sortedPower.map((_, index) => index + 1); // 1-based index for x-axis
-	
-	    // Log the sorted power data for debugging
-	    console.log("Sorted Power Data (descending):", sortedPower);
-	
-	    if (sortedPower.length === 0) {
-	        console.error("No valid power data available.");
-	        return;
-	    }
-	
-	    const container = document.getElementById(containerId);
-	    const canvas = document.createElement('canvas');
-	    container.appendChild(canvas);
-	
-	    new Chart(canvas.getContext('2d'), {
-	        type: 'line',
-	        data: {
-	            labels: sortedIndex, // Use sorted index for the x-axis (rank)
-	            datasets: [
-	                {
-	                    label: 'Power / Time',
-	                    data: sortedPower, // Use the sorted power data
-	                    borderColor: colorSet.power,
-	                    backgroundColor: colorSet.power + '33',
-	                    fill: false,
-	                    tension: 0.3,
-	                    yAxisID: 'y1',
-	                    pointRadius: 0.3,
-	                    borderWidth: 1,
-	                    borderDash: [5, 5]
-	                }
-	            ]
-	        },
-	        options: {
-	            responsive: true,
-	            plugins: {
-	                title: {
-	                    display: true,
-	                    text: activityLabel,
-	                    color: 'white',
-	                    font: {
-	                        size: 24
-	                    }
-	                },
-	                legend: {
-	                    labels: {
-	                        color: 'white'
-	                    }
-	                }
-	            },
-	            scales: {
-	                x: {
-	                    ticks: { color: 'white' },
-	                    grid: { color: '#444' },
-	                },
-	                y: {
-	                    type: 'linear',
-	                    position: 'left',
-	                    title: { display: true, text: 'Power (W)', color: colorSet.power },
-	                    ticks: {
-	                        color: colorSet.power,
-	                        callback: function(value) {
-	                            return value.toLocaleString(); // Format large numbers
-	                        }
-	                    },
-	                    grid: { color: '#444' },
-	                    min: 0,
-	                    max: Math.ceil(Math.max(...sortedPower) * 1.1)
-	                }
-	            }
-	        }
-	    });
+		// Sort power values in decreasing order
+		const sortedPower = [...activityData.power].sort((a, b) => b - a);
+		
+		// Generate index-based x-axis (representing "rank" of each power value)
+		const sortedIndex = sortedPower.map((_, index) => index + 1); // 1-based index for x-axis
+		
+		// Log the sorted power data for debugging
+		console.log("Sorted Power Data (descending):", sortedPower);
+		
+		if (sortedPower.length === 0) {
+			console.error("No valid power data available.");
+			return;
+		}
+		
+		const container = document.getElementById(containerId);
+		const canvas = document.createElement('canvas');
+		container.appendChild(canvas);
+		
+		new Chart(canvas.getContext('2d'), {
+			type: 'line',
+			data: {
+				labels: sortedIndex, // Use sorted index for the x-axis (rank)
+				datasets: [
+					{
+						label: 'Power / Time',
+						data: sortedPower, // Use the sorted power data
+						borderColor: colorSet.power,
+						backgroundColor: colorSet.power + '33',
+						fill: false,
+						tension: 0.3,
+						yAxisID: 'y1',
+						pointRadius: 0.3,
+						borderWidth: 1,
+						borderDash: [5, 5]
+					}
+				]
+			},
+			options: {
+				responsive: true,
+				plugins: {
+					title: {
+						display: true,
+						text: activityLabel,
+						color: 'white',
+						font: {
+							size: 24
+						}
+					},
+					legend: {
+						labels: {
+							color: 'white'
+						}
+					}
+				},
+			scales: {
+				x: {
+					ticks: { color: 'white' },
+					grid: { color: '#444' },
+				},
+				y: {
+					type: 'linear',
+					position: 'left',
+					title: { display: true, text: 'Power (W)', color: colorSet.power },
+					ticks: {
+						color: colorSet.power,
+						callback: function(value) {
+							return value.toLocaleString(); // Format large numbers
+						}
+					},
+					grid: { color: '#444' },
+					min: 0,
+					max: Math.ceil(Math.max(...sortedPower) * 1.1)
+					}
+				}
+			}
+		});
 	};
 
 
