@@ -117,6 +117,7 @@
 	  <div class="chart-container" id="outdoorActivityChartContainer"></div>
 	  <div class="chart-container" id="powerChartContainer"></div>
 	</div>
+	<div class="chart-container" id="allChartContainer"></div>
   </div>
 
   <div class="content" id="indoor">
@@ -190,120 +191,126 @@
 	};
 	
 	const createActivityChart = (containerId, activityData, activityLabel, colorSet) => {
-		const container = document.getElementById(containerId);
-		const canvas = document.createElement('canvas');
-		container.appendChild(canvas);
-
-		new Chart(canvas.getContext('2d'), {
-			type: 'line',
-			data: {
-				labels: activityData.time,
-				datasets: [
-					{
-						label: 'Speed (km/h)',
-						data: activityData.speed,
-						borderColor: colorSet.speed,
-						backgroundColor: colorSet.speed + '33',
-						fill: false,
-						tension: 0.3,
-						yAxisID: 'y1',
-						pointRadius: 0.3,
-						borderWidth: 1,
-						borderDash: [5, 5]
-					},
-					{
-						label: 'Cadence (rpm)',
-						data: activityData.cadence,
-						borderColor: colorSet.cadence,
-						backgroundColor: colorSet.cadence + '33',
-						fill: false,
-						tension: 0.3,
-						yAxisID: 'y2',
-						pointRadius: 0.5,
-						borderWidth: 1,
-						borderDash: [5, 5]
-					},
-					{
-						label: 'Power (W)',
-						data: activityData.power,
-						borderColor: colorSet.power,
-						backgroundColor: colorSet.power + '33',
-						fill: true,
-						tension: 0.3,
-						pointRadius: 1,
-						yAxisID: 'y3'
-					},
-					{
-						label: 'Heart Rate (bpm)',
-						data: activityData.heartRate,
-						borderColor: colorSet.heartRate,
-						backgroundColor: colorSet.heartRate + '33',
-						borderWidth: 1,
-						fill: false,
-						tension: 0.3,
-						pointRadius: 0.1,
-						yAxisID: 'y4'
-					}
-				]
-			},
-			options: {
-				responsive: true,
-				plugins: {
-					title: {
-						display: true,
-						text: activityLabel,
-						color: 'white',
-						font: {
-						    size: 24 // <- This sets the font size (affects "height")
-						}
-					  },
-					legend: {
-						labels: {
-							color: 'white'
-						}
-					}
-				},
-				scales: {
-					x: {
-						ticks: { color: 'white' },
-						grid: { color: '#444' }
-					},
-					y1: {
-						position: 'left',
-						title: { display: true, text: 'Speed (km/h)', color: colorSet.speed },
-						ticks: { color: colorSet.speed },
-						grid: { color: '#444' },
-						min: 0,
-						max: Math.ceil(Math.max(...activityData.speed) * 4)
-					},
-					y2: {
-						position: 'right',
-						title: { display: true, text: 'Cadence (rpm)', color: colorSet.cadence },
-						ticks: { color: colorSet.cadence },
-						grid: { drawOnChartArea: false },
-						min: 0,
-						max: Math.ceil(Math.max(...activityData.cadence) * 2.2)
-					},
-					y3: {
-						position: 'right',
-						title: { display: true, text: 'Power (W)', color: colorSet.power },
-						ticks: { color: colorSet.power },
-						grid: { drawOnChartArea: false },
-						min: 0,
-						max: Math.ceil(Math.max(...activityData.power) * 1.5)
-					},
-					y4: {
-						position: 'right',
-						title: { display: true, text: 'Heart Rate (bpm)', color: colorSet.heartRate },
-						ticks: { color: colorSet.heartRate },
-						grid: { drawOnChartArea: false },
-						min: 0,
-						max: Math.ceil(Math.max(...activityData.heartRate) * 1)
-					}
-				}
-			}
-		});
+	        const container = document.getElementById(containerId);
+	        const card = document.createElement('div');
+	        card.style.backgroundColor = '#222';
+	        card.style.margin = '20px 0';
+	        card.style.padding = '20px';
+	        card.style.borderRadius = '12px';
+	        card.style.boxShadow = '0 4px 12px rgba(0,0,0,0.5)';
+	
+	        const title = document.createElement('h3');
+	        title.innerText = activityLabel;
+	        title.style.color = 'white';
+	        title.style.textAlign = 'center';
+	        card.appendChild(title);
+	
+	        const canvas = document.createElement('canvas');
+	        card.appendChild(canvas);
+	        container.appendChild(card);
+	
+	        new Chart(canvas.getContext('2d'), {
+	                type: 'line',
+	                data: {
+	                        labels: activityData.time,
+	                        datasets: [
+	                                {
+	                                        label: 'Speed (km/h)',
+	                                        data: activityData.speed,
+	                                        borderColor: colorSet.speed,
+	                                        backgroundColor: colorSet.speed + '33',
+	                                        fill: false,
+	                                        tension: 0.3,
+	                                        yAxisID: 'y1',
+	                                        pointRadius: 0.3,
+	                                        borderWidth: 1,
+	                                        borderDash: [5, 5]
+	                                },
+	                                {
+	                                        label: 'Cadence (rpm)',
+	                                        data: activityData.cadence,
+	                                        borderColor: colorSet.cadence,
+	                                        backgroundColor: colorSet.cadence + '33',
+	                                        fill: false,
+	                                        tension: 0.3,
+	                                        yAxisID: 'y2',
+	                                        pointRadius: 0.5,
+	                                        borderWidth: 1,
+	                                        borderDash: [5, 5]
+	                                },
+	                                {
+	                                        label: 'Power (W)',
+	                                        data: activityData.power,
+	                                        borderColor: colorSet.power,
+	                                        backgroundColor: colorSet.power + '33',
+	                                        fill: true,
+	                                        tension: 0.3,
+	                                        pointRadius: 1,
+	                                        yAxisID: 'y3'
+	                                },
+	                                {
+	                                        label: 'Heart Rate (bpm)',
+	                                        data: activityData.heartRate,
+	                                        borderColor: colorSet.heartRate,
+	                                        backgroundColor: colorSet.heartRate + '33',
+	                                        borderWidth: 1,
+	                                        fill: false,
+	                                        tension: 0.3,
+	                                        pointRadius: 0.1,
+	                                        yAxisID: 'y4'
+	                                }
+	                        ]
+	                },
+	                options: {
+	                        responsive: true,
+	                        plugins: {
+	                                title: { display: false },
+	                                legend: {
+	                                        labels: { color: 'white' }
+	                                }
+	                        },
+	                        scales: {
+	                                x: {
+	                                        ticks: { color: 'white' },
+	                                        grid: { color: '#444' }
+	                                },
+	                                y1: {
+	                                        position: 'left',
+	                                        title: { display: true, text: 'Speed (km/h)', color: colorSet.speed },
+	                                        ticks: { color: colorSet.speed },
+	                                        grid: { color: '#444' },
+	                                        min: 0,
+	                                        max: Math.ceil(Math.max(...activityData.speed) * 4)
+	                                },
+	                                y2: {
+	                                        position: 'right',
+	                                        title: { display: true, text: 'Cadence (rpm)', color: colorSet.cadence },
+	                                        ticks: { color: colorSet.cadence },
+	                                        grid: { drawOnChartArea: false },
+	                                        min: 0,
+	                                        max: Math.ceil(Math.max(...activityData.cadence) * 2.2)
+	                                },
+	                                y3: {
+	                                        position: 'right',
+	                                        title: { display: true, text: 'Power (W)', color: colorSet.power },
+	                                        ticks: { color: colorSet.power },
+	                                        grid: { drawOnChartArea: false },
+	                                        min: 0,
+	                                        max: Math.ceil(Math.max(...activityData.power) * 1.5)
+	                                },
+	                                y4: {
+	                                        position: 'right',
+	                                        title: { display: true, text: 'Heart Rate (bpm)', color: colorSet.heartRate },
+	                                        ticks: { color: colorSet.heartRate },
+	                                        grid: { drawOnChartArea: false },
+	                                        min: 0,
+	                                        max: Math.ceil(Math.max(...activityData.heartRate) * 1)
+	                                }
+	                        }
+	                }
+	        });
 	};
+
 	
 	const createPowerChart = (containerId, activityData, activityLabel, colorSet) => {
 		const container = document.getElementById(containerId);
@@ -363,38 +370,58 @@
 			}
 		});
 	};
-	
-	async function loadActivityData() {
+
+	async function loadAllActivities() {
 		try {
-			const fileName = '2025-04-26_10-58-04_activity_14275726812.json'; 
-			const response = await fetch(`https://strava.manueltiefenbacher998.workers.dev//?file=${fileName}`);
-			console.log('Antwortstatus:', response.status);
-		
-			if (!response.ok) {
-				throw new Error('Netzwerkantwort war nicht ok');
+			// 1. Fetch the list of activity files from your Cloudflare Worker
+			const listResponse = await fetch('https://strava.manueltiefenbacher998.workers.dev/');
+			if (!listResponse.ok) {
+				throw new Error('Failed to fetch file list');
 			}
+		
+			const fileNames = await listResponse.json(); // Array of filenames
+			console.log('Gefundene Dateien:', fileNames);
+		
+			// 2. Loop through each file and load its data
+			for (const fileName of fileNames) {
+				const activityData = await loadActivityData(fileName);
+				if (activityData) {
+					createActivityChart(activityData); // 3. Create a chart for each activity
+				}
+			}
+		} catch (error) {
+		console.error('Fehler beim Laden aller Aktivitäten:', error);
+		}
+	}
+	  
+	async function loadActivityData(fileName) {
+		try {
+			const response = await fetch(`https://strava.manueltiefenbacher998.workers.dev/?file=${fileName}`);
 			
+			if (!response.ok) {
+				throw new Error(`Fehler beim Laden der Datei: ${fileName}`);
+			}
+		
 			const jsonData = await response.json();
-			console.log('Geladene Daten:', jsonData);
-			
-			// Zeitdaten generieren (angenommen, 1 Datensatz entspricht 1 Sekunde)
+		
 			const time = Array.from({ length: jsonData.cadence.data.length }, (_, i) => {
 				const min = String(Math.floor(i / 60)).padStart(2, '0');
 				const sec = String(i % 60).padStart(2, '0');
 				return `${min}:${sec}`;
 			});
-			
+		
 			const activityData = {
 				time: time,
 				speed: jsonData.distance.data,
 				cadence: jsonData.cadence.data,
-				power: jsonData.distance.data.map(d => d * 0.5), 
+				power: jsonData.distance.data.map(d => d * 0.5),
 				heartRate: jsonData.heartrate.data
 			};
 		
-		return activityData;
+			return activityData;
 		} catch (error) {
-			console.error('Fehler beim Laden der JSON-Daten:', error);
+		console.error('Fehler beim Laden der JSON-Daten:', error);
+		return null;
 		}
 	}
 
