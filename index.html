@@ -7,98 +7,113 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
-      margin: 0;
-      font-family: 'Segoe UI', sans-serif;
-      background-color: #1e1e1e;
-      color: #fff;
-    }
-    .tabs {
-      display: flex;
-      justify-content: center;
-      background-color: #2a2a2a;
-    }
-    .tab {
-      padding: 1rem 2rem;
-      cursor: pointer;
-      color: #aaa;
-    }
-    .tab.active {
-      color: #00bcd4;
-      border-bottom: 3px solid #00bcd4;
-    }
-    .content {
-      display: none;
-      padding: 2rem;
-    }
-    .content.active {
-      display: block;
-    }
-    .charts-container {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 2rem;
-      max-width: 100%;
-      margin: auto;
-    }
-    canvas {
-      background-color: #333;
-      border-radius: 10px;
-      padding: 1rem;
-      width: 100% !important;
-      height: auto !important;
-    }
-    .ranking-section h3 {
-      border-bottom: 1px solid #444;
-      padding-bottom: 0.5rem;
-    }
-    .ranking-list {
-      list-style: none;
-      padding: 0;
-    }
-    .ranking-list li {
-      background-color: #2a2a2a;
-      padding: 0.75rem 1rem;
-      border-radius: 5px;
-      margin: 0.5rem 0;
-    }
-	.ranking-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 2em;
-    }
-    .ranking-table th,
-    .ranking-table td {
-      border: 1px solid #1e1e1e;
-      padding: 8px;
-      text-align: left;
-	  font-size: 0.85rem;
-      padding: 4px 8px; /* evtl. auch den Zellabstand verkleinern */
-    }
-    .ranking-table th {
-      background-color: #2a2a2a;
-    }
-	.ranking-section {
-	  flex: 1 1 auto; /* lässt die Breite anpassen, aber nicht erzwungen voll ausdehnen */
-	  max-width: 300px; /* oder was für deine Inhalte passt */
-	  min-width: 250px; /* verhindert zu kleine Darstellung */
-	  box-sizing: border-box;
+	  margin: 0;
+	  font-family: 'Segoe UI', sans-serif;
+	  background-color: #1e1e1e;
+	  color: #fff;
 	}
-	.chart-container {
-	  flex: 1 1 auto; /* lässt die Breite anpassen, aber nicht erzwungen voll ausdehnen */
-	  max-width: 1200px; /* oder was für deine Inhalte passt */
-	  min-width: 250px; /* verhindert zu kleine Darstellung */
+	
+	/* Tabs styling */
+	.tabs {
+	  display: flex;
+	  justify-content: center;
+	  background-color: #2a2a2a;
 	}
+	.tab {
+	  padding: 1rem 2rem;
+	  cursor: pointer;
+	  color: #aaa;
+	}
+	.tab.active {
+	  color: #00bcd4;
+	  border-bottom: 3px solid #00bcd4;
+	}
+	
+	/* Content */
+	.content {
+	  display: none;
+	  padding: 2rem;
+	}
+	.content.active {
+	  display: block;
+	}
+	
+	/* Charts layout */
 	.container {
 	  display: flex;
-	  flex-wrap: wrap; /* ermöglicht Zeilenumbruch */
-	  justify-content: center; /* zentriert die Elemente horizontal */
-	  gap: 2rem; /* Abstand zwischen den Elementen */
-	  padding: 1rem;
+	  gap: 2rem;
+	  padding: 2rem;
+	  flex-wrap: wrap;
+	  justify-content: center;
 	}
-	/* Stack vertically on small screens */
+	
+	/* Left large chart */
+	.left-side {
+	  flex: 2;
+	  min-width: 300px;
+	}
+	
+	/* Right side smaller charts */
+	.right-side {
+	  flex: 1;
+	  display: flex;
+	  flex-direction: column;
+	  gap: 2rem;
+	  min-width: 300px;
+	}
+	
+	/* Chart and ranking boxes */
+	.chart-container, .ranking-section {
+	  background-color: #333;
+	  border-radius: 10px;
+	  padding: 1rem;
+	  box-sizing: border-box;
+	}
+	
+	/* Canvas inside chart */
+	canvas {
+	  background-color: #333;
+	  border-radius: 10px;
+	  width: 100% !important;
+	  height: auto !important;
+	}
+	
+	/* Ranking section specific */
+	.ranking-section h3 {
+	  border-bottom: 1px solid #444;
+	  padding-bottom: 0.5rem;
+	}
+	.ranking-list {
+	  list-style: none;
+	  padding: 0;
+	}
+	.ranking-list li {
+	  background-color: #2a2a2a;
+	  padding: 0.75rem 1rem;
+	  border-radius: 5px;
+	  margin: 0.5rem 0;
+	}
+	
+	/* Ranking table */
+	.ranking-table {
+	  width: 100%;
+	  border-collapse: collapse;
+	  margin-bottom: 2em;
+	}
+	.ranking-table th,
+	.ranking-table td {
+	  border: 1px solid #1e1e1e;
+	  padding: 4px 8px;
+	  font-size: 0.85rem;
+	}
+	.ranking-table th {
+	  background-color: #2a2a2a;
+	}
+	
+	/* Responsive behavior */
 	@media (max-width: 700px) {
 	  .container {
-		flex-direction: column;
+	    flex-direction: column;
 	  }
 	}
   </style>
@@ -112,10 +127,14 @@
 
   <div class="content active" id="outdoor">
 	<div class="container">
-	  <div class="chart-container" id="outdoorActivityChartContainer"></div>
-	  <div class="chart-container" id="powerChartContainer"></div>
+	  <div class="left-side">
+	    <div class="chart-container" id="outdoorActivityChartContainer"></div>
+	  </div>
+	  <div class="right-side">
+	    <div class="chart-container" id="powerChartContainer"></div>
+	    <div class="ranking-section" id="outdoorRanking"></div>
+	  </div>
 	</div>
-	<div class="ranking-section" id="outdoorRanking"></div>
 	<div class="chart-container" id="allChartContainer"></div>
   </div>
 
