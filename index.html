@@ -366,35 +366,33 @@
 	
 	async function loadActivityData() {
 		try {
-			const response = await fetch('2025-04-24_22-16-23_latestActivity.json'); // JSON-Datei laden
+			const fileName = '2025-04-24_22-16-23_latestActivity.json'; 
+			const response = await fetch(`https://<your-worker-subdomain>.workers.dev/?file=${fileName}`);
 			console.log('Antwortstatus:', response.status);
-			if (!response.ok) {
-			    throw new Error('Netzwerkantwort war nicht ok');
-			}
-			
+		
 			if (!response.ok) {
 				throw new Error('Netzwerkantwort war nicht ok');
 			}
-
+			
 			const jsonData = await response.json();
-			console.log('Geladene Daten:', jsonData); // Füge eine Konsolenausgabe hinzu
-
+			console.log('Geladene Daten:', jsonData);
+			
 			// Zeitdaten generieren (angenommen, 1 Datensatz entspricht 1 Sekunde)
 			const time = Array.from({ length: jsonData.cadence.data.length }, (_, i) => {
 				const min = String(Math.floor(i / 60)).padStart(2, '0');
 				const sec = String(i % 60).padStart(2, '0');
 				return `${min}:${sec}`;
 			});
-
+			
 			const activityData = {
-				time: time,  // Generierte Zeit aus den Daten
-				speed: jsonData.distance.data,  // Entfernungsdaten als "Speed"
-				cadence: jsonData.cadence.data,  // Kadenzdaten
-				power: jsonData.distance.data.map(d => d * 0.5),  // Beispiel für Power (angenommen)
-				heartRate: jsonData.heartrate.data  // Herzfrequenzdaten
+				time: time,
+				speed: jsonData.distance.data,
+				cadence: jsonData.cadence.data,
+				power: jsonData.distance.data.map(d => d * 0.5), 
+				heartRate: jsonData.heartrate.data
 			};
-
-			return activityData; // Gib die geladenen Daten zurück
+		
+		return activityData;
 		} catch (error) {
 			console.error('Fehler beim Laden der JSON-Daten:', error);
 		}
