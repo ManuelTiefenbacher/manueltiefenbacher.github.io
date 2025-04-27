@@ -191,6 +191,8 @@ const createActivityCadenceChart = (containerId, activityData, activityLabel, co
   
   // Convert an array of speeds from m/s to km/h
   let speedData = activityData.speed.map(speed => speed * 3.6);
+  
+  console.log(activityData);
 
   // Create a Chart.js line chart
   new Chart(canvas.getContext('2d'), {
