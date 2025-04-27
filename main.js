@@ -191,8 +191,6 @@ const createActivityCadenceChart = (containerId, activityData, activityLabel, co
   
   // Convert an array of speeds from m/s to km/h
   let speedData = activityData.speed.map(speed => speed * 3.6);
-  
-  console.log(activityData);
 
   // Create a Chart.js line chart
   new Chart(canvas.getContext('2d'), {
@@ -400,6 +398,7 @@ async function initializeChart() {
     const latestFile = fileNames[0]; // Take the latest file (can be changed to a sorted method)
 
     const activityData = await loadActivityData(latestFile);
+	console.log(activityData);
     if (activityData) {
       createActivityPerformanceChart('performanceChartContainer', activityData, 'Performance Data', colorSet);
 	  createActivityCadenceChart('cadenceChartContainer', activityData, 'Cadence Data', colorSet);
