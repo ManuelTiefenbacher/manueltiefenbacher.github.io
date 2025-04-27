@@ -1,0 +1,97 @@
+/* General page styling */
+body {
+  margin: 0; /* Remove default margin */
+  font-family: 'Segoe UI', sans-serif; /* Set the font for the page */
+  background-color: #1e1e1e; /* Dark background color */
+  color: #fff; /* Default text color is white */
+}
+
+/* Tabs styling */
+.tabs {
+  display: flex; /* Arrange tabs horizontally */
+  justify-content: center; /* Center the tabs */
+  background-color: #2a2a2a; /* Darker background for tab area */
+}
+.tab {
+  padding: 1rem 2rem; /* Add space inside each tab */
+  cursor: pointer; /* Change cursor to pointer when hovering */
+  color: #aaa; /* Default tab text color (gray) */
+}
+.tab.active {
+  color: #00bcd4; /* Active tab text color (cyan) */
+  border-bottom: 3px solid #00bcd4; /* Highlight active tab with a colored border */
+}
+
+/* Content sections */
+.content {
+  display: none; /* Hide content sections by default */
+  padding: 2rem; /* Add padding inside the content */
+}
+.content.active {
+  display: block; /* Show the active content section */
+}
+
+/* Layout for charts */
+.container {
+  display: flex; /* Arrange children in a row */
+  gap: 2rem; /* Space between items */
+  padding: 2rem; /* Padding inside container */
+  flex-wrap: wrap; /* Allow wrapping to next line on smaller screens */
+  justify-content: center; /* Center the content */
+}
+
+/* Left side (main big chart) */
+.left-side {
+  flex: 2; /* Take more space than the right side */
+  gap: 1rem;
+  min-width: 300px; /* Minimum width to prevent it from becoming too small */
+}
+
+/* Right side (smaller charts and ranking) */
+.right-side {
+  flex: 1; /* Take less space than left side */
+  display: flex; /* Arrange content vertically */
+  flex-direction: column; /* Stack items vertically */
+  gap: 1rem; /* Space between stacked items */
+  min-width: 300px; /* Minimum width */
+}
+
+
+/* Specific styling for the ranking section */
+.ranking-section h3 {
+  border-bottom: 1px solid #444; /* Underline heading with a thin line */
+  padding-bottom: 0.5rem; /* Add space below heading text */
+}
+.ranking-list {
+  list-style: none; /* Remove bullet points */
+  padding: 0; /* Remove default list padding */
+}
+.ranking-list li {
+  background-color: #2a2a2a; /* Dark background for each ranking item */
+  padding: 0.75rem 1rem; /* Padding inside each item */
+  border-radius: 5px; /* Slightly rounded corners */
+  margin: 0.5rem 0; /* Space between ranking items */
+}
+
+/* Table used in rankings */
+.ranking-table {
+  width: 100%; /* Full width */
+  border-collapse: collapse; /* Merge table borders */
+  margin-bottom: 2em; /* Add space below table */
+}
+.ranking-table th,
+.ranking-table td {
+  border: 1px solid #1e1e1e; /* Border around cells */
+  padding: 4px 8px; /* Padding inside cells */
+  font-size: 0.85rem; /* Slightly smaller text */
+}
+.ranking-table th {
+  background-color: #2a2a2a; /* Darker background for table headers */
+}
+
+/* Responsive behavior for smaller screens */
+@media (max-width: 700px) {
+  .container {
+    flex-direction: column; /* Stack elements vertically instead of side by side */
+  }
+}
