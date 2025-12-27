@@ -78,7 +78,11 @@ function analyzeRecovery(last7, last14, last7Runs) {
     message = `${totalLast7} runs in the last week with ${highIntensityLast7} high-intensity sessions. Training load appears manageable.`;
   }
 
-  return { status, message, metric: 'Recovery & Rest' };
+  const tooltip = `🟢 Green: ≥60% easy runs OR manageable load
+🟡 Yellow: No runs, or 3+ high-intensity with <2 easy, or 6+ runs with <3 easy
+🔴 Red: 4+ high-intensity sessions in 7 days with insufficient recovery`;
+
+  return { status, message, metric: 'Recovery & Rest', tooltip };
 }
 
 function analyzeIntensityDistribution(last28, last28Runs) {
@@ -118,7 +122,11 @@ function analyzeIntensityDistribution(last28, last28Runs) {
     message = `Balanced distribution over ${total} runs: ${z2} easy, ${intensity} intensity, ${race} race efforts. Total: ${totalDistance.toFixed(1)} km.`;
   }
 
-  return { status, message, metric: 'Intensity Distribution (28 days)' };
+  const tooltip = `🟢 Green: ≥60% easy runs following 80/20 principle
+🟡 Yellow: <60% easy with >30% hard, or no runs in 28 days
+🔴 Red: <50% easy with >40% hard efforts - overtraining risk`;
+
+  return { status, message, metric: 'Intensity Distribution (28 days)', tooltip };
 }
 
 function analyzeVolume(last7, last14, last28) {
@@ -152,7 +160,11 @@ function analyzeVolume(last7, last14, last28) {
     message = `Consistent weekly volume: ${avgWeek7.toFixed(1)} km last 7 days, ${avgWeek28.toFixed(1)} km average per week over 28 days.`;
   }
 
-  return { status, message, metric: 'Volume Progression' };
+  const tooltip = `🟢 Green: Volume change within ±15% (respects 10% rule)
+🟡 Yellow: 15-30% increase or >40% decrease, or no volume
+🔴 Red: >30% weekly increase - high injury risk`;
+
+  return { status, message, metric: 'Volume Progression', tooltip };
 }
 
 function analyzeLongRuns(allRuns, last28) {
@@ -182,7 +194,12 @@ function analyzeLongRuns(allRuns, last28) {
     message = `${longRunsLast28.length} long run(s) completed. Last long run: ${daysSinceLastLong} days ago.`;
   }
 
-  return { status, message, metric: 'Long Run Frequency' };
+  const tooltip = `🟢 Green: 1-3 long runs in 28 days with recent activity
+🟡 Yellow: No long runs in 28 days, or 4+ long runs (may impact recovery)
+
+Long run = distance >50% of weekly average`;
+
+  return { status, message, metric: 'Long Run Frequency', tooltip };
 }
 
 function analyzeRaceEfforts(last7, last14, last28) {
@@ -213,7 +230,11 @@ function analyzeRaceEfforts(last7, last14, last28) {
     message = `${race28} race efforts in 28 days. High frequency of maximal efforts detected.`;
   }
 
-  return { status, message, metric: 'Race Effort Frequency' };
+  const tooltip = `🟢 Green: 0-3 race efforts in 28 days (appropriate spacing)
+🟡 Yellow: 2 race efforts with few total runs, or 4+ in 14 days, or 4+ in 28 days
+🔴 Red: 3+ race efforts in 7 days - very high anaerobic stress`;
+
+  return { status, message, metric: 'Race Effort Frequency', tooltip };
 }
 
 function calculateAverageWeekly(runs, currentDate) {
@@ -242,13 +263,81 @@ function renderTrainingLoadAnalysis(runs) {
     'red': '🔴'
   };
 
+  // Add CSS for tooltips if not already present
+  if (!document.getElementById('tooltip-styles')) {
+    const style = document.createElement('style');
+    style.id = 'tooltip-styles';
+    style.textContent = `
+      .training-analysis .status-icon-wrapper {
+        position: relative;
+        display: inline-block;
+        cursor: help;
+      }
+      
+      .training-analysis .status-icon-wrapper .analysis-tooltip {
+        visibility: hidden;
+        opacity: 0;
+        display: block;
+        position: absolute;
+        z-index: 99999;
+        top: 100%;
+        left: 0;
+        margin-top: 8px;
+        background-color: #1a1a1a;
+        color: #fff;
+        text-align: left;
+        padding: 12px 16px;
+        border-radius: 8px;
+        font-size: 13px;
+        line-height: 1.5;
+        white-space: pre-line;
+        width: 350px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        transition: opacity 0.2s, visibility 0.2s;
+        pointer-events: none;
+      }
+      
+      .training-analysis .status-icon-wrapper .analysis-tooltip::before {
+        content: "";
+        position: absolute;
+        bottom: 100%;
+        left: 15px;
+        border-width: 6px;
+        border-style: solid;
+        border-color: transparent transparent #1a1a1a transparent;
+      }
+      
+      .training-analysis .status-icon-wrapper:hover .analysis-tooltip {
+        visibility: visible;
+        opacity: 1;
+      }
+      
+      .training-analysis .analysis-header {
+        overflow: visible;
+        position: relative;
+      }
+      
+      .training-analysis .analysis-card {
+        overflow: visible;
+        position: relative;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
   let html = '<div class="training-analysis">';
   
   Object.values(analysis).forEach(item => {
+    // Escape quotes in tooltip for HTML attribute
+    const tooltipText = item.tooltip.replace(/"/g, '&quot;');
+    
     html += `
       <div class="analysis-card ${item.status}">
-        <div class="analysis-header">
-          <span class="status-icon">${statusIcon[item.status]}</span>
+        <div class="analysis-header" style="position: relative;">
+          <span class="status-icon-wrapper" data-tooltip="${tooltipText}">
+            <span class="status-icon">${statusIcon[item.status]}</span>
+            <span class="analysis-tooltip">${item.tooltip}</span>
+          </span>
           <h3>${item.metric}</h3>
         </div>
         <p class="analysis-message">${item.message}</p>
@@ -259,4 +348,11 @@ function renderTrainingLoadAnalysis(runs) {
   html += '</div>';
   
   container.innerHTML = html;
+  
+  // Debug: Check if tooltips are in the DOM
+  const tooltips = container.querySelectorAll('.tooltip');
+  console.log('Tooltips found:', tooltips.length);
+  tooltips.forEach((tip, i) => {
+    console.log(`Tooltip ${i}:`, tip.textContent.substring(0, 50));
+  });
 }

@@ -5,15 +5,19 @@ function analyze(newRuns) {
   
 	// Combine and remove duplicates based on ID
 	const combinedRuns = [...oldRuns, ...newRuns];
-
 	// Remove duplicates - keep the first occurrence (CSV has priority)
 	const uniqueRuns = combinedRuns.filter((run, index, self) => 
 	  index === self.findIndex(r => r.id === run.id)
 	);
 	allRuns = uniqueRuns;
 	oldRuns = allRuns;
+	
+	// Fixed console.log (was missing opening backtick)
 	console.log(`Total runs: ${combinedRuns.length}, Unique runs: ${uniqueRuns.length}`);
-
+	
+	// Check if tcxDataCache is available
+	console.log('TCX data available:', Object.keys(window.tcxDataCache || {}).length, 'files');
+	
 	// Filter runs from last 6 months
 	const recentRuns = allRuns.filter(r => r.date >= sixMonthsAgo);
   
@@ -23,16 +27,17 @@ function analyze(newRuns) {
 		const w = isoWeek(r.date);
 		weekly[w] = (weekly[w] || 0) + r.distance;
 	});
-
 	const weeks = Object.keys(weekly).sort();
 	const values = weeks.map(w => weekly[w]);
 	const avgWeekly = values.reduce((a,b)=>a+b,0)/values.length;
-
+	
+	console.log('Analyzing', allRuns.length, 'runs');
+	
 	renderBasicInfo(avgWeekly, allRuns);
 	renderAverageDistanceChartWithZones(allRuns, avgWeekly);
 	renderIntensityChart(allRuns);
 	renderTimeline(allRuns, avgWeekly);
-	renderTrainingLoadAnalysis(allRuns)
+	renderTrainingLoadAnalysis(allRuns);
 }
 
 function isoWeek(d){

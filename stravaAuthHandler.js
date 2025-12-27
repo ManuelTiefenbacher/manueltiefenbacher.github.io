@@ -40,21 +40,52 @@ function restoreSavedData() {
 		try {
 			const parsedData = JSON.parse(savedData);
 			
-			// Convert date strings back to Date objects
-			const stravaRuns = parsedData.map(r => ({
-				...r,
-				date: new Date(r.date)
-			}));
-			
-			// Call analyze with the restored data
-			analyze(stravaRuns);
-			
-			showFeedback('✅ Restored previous Strava data from session', 'success');
+			// Only proceed if we actually have data
+			if (parsedData && parsedData.length > 0) {
+				// Convert date strings back to Date objects
+				const stravaRuns = parsedData.map(r => ({
+					...r,
+					date: new Date(r.date)
+				}));
+				
+				// Call analyze with the restored data
+				analyze(stravaRuns);
+				
+				// Show session info banner instead of feedback message
+				showStravaSessionBanner(stravaRuns.length);
+			}
 		} catch (err) {
 			console.error('Error restoring saved data:', err);
 			sessionStorage.removeItem('stravaData');
 		}
 	}
+}
+
+function showStravaSessionBanner(activityCount) {
+	const banner = document.getElementById('stravaSessionInfo');
+	if (banner) {
+		banner.style.display = 'flex';
+		const countSpan = banner.querySelector('#stravaActivityCount');
+		if (countSpan) {
+			countSpan.textContent = activityCount;
+		}
+	}
+}
+
+function clearStravaData() {
+	sessionStorage.removeItem('stravaData');
+	sessionStorage.removeItem('stravaToken');
+	sessionStorage.removeItem('stravaClientId');
+	sessionStorage.removeItem('stravaClientSecret');
+	
+	// Hide the banner
+	const banner = document.getElementById('stravaSessionInfo');
+	if (banner) {
+		banner.style.display = 'none';
+	}
+	
+	// Reload the page to reset everything
+	location.reload();
 }
 
 function initiateAuth() {

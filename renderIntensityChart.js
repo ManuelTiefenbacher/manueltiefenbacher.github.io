@@ -2,6 +2,11 @@ function renderIntensityChart(runsParam) {
   // Always use current data source
   const runs = Array.isArray(runsParam) ? runsParam : window.runs;
 
+  console.log('=== INTENSITY CHART DEBUG ===');
+  console.log('Total runs passed:', runs.length);
+  console.log('tcxDataCache keys:', Object.keys(window.tcxDataCache || {}));
+  console.log('tcxDataCache:', window.tcxDataCache);
+  
   // Get zone boundaries from window and convert to numbers
   const z2 = Number(window.z2Upper);
   const z3 = Number(window.z3Upper);
@@ -27,6 +32,9 @@ function renderIntensityChart(runsParam) {
     .map(r => ({ ...r, date: r.date instanceof Date ? r.date : new Date(r.date) }))
     .filter(r => (now - r.date) / 86400000 <= 28);
 
+  console.log('Runs in last 28 days:', last28DaysRuns.length);
+  console.log('Sample run from last 28 days:', last28DaysRuns[0]);
+
   // Check HR_MAX
   if (typeof HR_MAX !== 'number' || !isFinite(HR_MAX) || HR_MAX <= 0) {
     console.error('[render] HR_MAX invalid:', HR_MAX);
@@ -47,39 +55,57 @@ function renderIntensityChart(runsParam) {
 
   // Initialize counting buckets (now 6 zones)
   const bucketCounts = new Array(6).fill(0);
-  const bucketDistances = new Array(6).fill(0); // Track distance per zone
+  const bucketDistances = new Array(6).fill(0);
   let totalDataPoints = 0;
   let runsWithDetailedData = 0;
   let totalDistance = 0;
 
-  last28DaysRuns.forEach(r => {
-    const tcxData = r.filename ? tcxDataCache[r.filename] : null;
+  last28DaysRuns.forEach((r, idx) => {
+    console.log(`\n--- Checking run ${idx + 1}/${last28DaysRuns.length} ---`);
+    console.log('Run filename:', r.filename);
+    console.log('Has filename?', !!r.filename);
+    
+    const tcxData = r.filename ? window.tcxDataCache[r.filename] : null;
+    console.log('TCX data found?', !!tcxData);
+    
+    if (tcxData) {
+      console.log('TCX data structure:', tcxData);
+      console.log('Has records array?', Array.isArray(tcxData.records));
+      if (Array.isArray(tcxData.records)) {
+        console.log('Number of records:', tcxData.records.length);
+        console.log('First 3 records:', tcxData.records.slice(0, 3));
+      }
+    }
+    
     if (tcxData && Array.isArray(tcxData.records)) {
       runsWithDetailedData++;
       totalDistance += r.distance || 0;
       
       const runDataPoints = [];
-      tcxData.records.forEach(record => {
+      tcxData.records.forEach((record, recIdx) => {
         const hr = record?.heart_rate;
+        
+        if (recIdx < 3) {
+          console.log(`Record ${recIdx}:`, record, 'HR:', hr);
+        }
+        
         if (hr && hr > 0) {
           totalDataPoints++;
           const p = hr / HR_MAX;
           
-          // Determine zone (0-5 for Z1-Z6)
           let idx;
-          if (p < bounds[0]) idx = 0; // Z1
-          else if (p < bounds[1]) idx = 1; // Z2
-          else if (p < bounds[2]) idx = 2; // Z3
-          else if (p < bounds[3]) idx = 3; // Z4
-          else if (p < 0.95) idx = 4; // Z5 (up to 95%)
-          else idx = 5; // Z6 (above 95%)
+          if (p < bounds[0]) idx = 0;
+          else if (p < bounds[1]) idx = 1;
+          else if (p < bounds[2]) idx = 2;
+          else if (p < bounds[3]) idx = 3;
+          else if (p < 0.95) idx = 4;
+          else idx = 5;
           
           bucketCounts[idx]++;
           runDataPoints.push(idx);
         }
       });
       
-      // Distribute run distance proportionally to zones
       if (runDataPoints.length > 0) {
         runDataPoints.forEach(idx => {
           bucketDistances[idx] += (r.distance || 0) / runDataPoints.length;
@@ -87,6 +113,11 @@ function renderIntensityChart(runsParam) {
       }
     }
   });
+
+  console.log('\n=== FINAL RESULTS ===');
+  console.log('Runs with detailed data:', runsWithDetailedData);
+  console.log('Total data points:', totalDataPoints);
+  console.log('Bucket counts:', bucketCounts);
 
   // Calculate percentages
   const data = bucketCounts.map(c => totalDataPoints > 0 ? (c / totalDataPoints * 100) : 0);

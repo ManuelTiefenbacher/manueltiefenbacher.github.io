@@ -20,6 +20,17 @@
   <header>
 	<h1>Tri-Runalyzer</h1>
 	<p>Consistency Analysis</p>
+	
+	<!-- Session Info Banner -->
+	<div id="sessionInfo" style="display: none; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 20px; border-radius: 8px; margin-top: 15px; align-items: center; justify-content: space-between;">
+	  <span style="font-weight: 600;">📦 Data from previous session loaded</span>
+	  <button onclick="clearAndReload()" style="background: rgba(255,255,255,0.2); color: white; padding: 8px 16px; border: 2px solid white; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s;">Clear Data</button>
+	</div>
+	<!-- Strava Session Info Banner -->
+	<div id="stravaSessionInfo" style="display: none; background: linear-gradient(135deg, #FC4C02 0%, #E73D02 100%); color: white; padding: 12px 20px; border-radius: 8px; margin-top: 15px; align-items: center; justify-content: space-between;">
+	  <span style="font-weight: 600;">🏃 <span id="stravaActivityCount">0</span> Strava activities loaded from previous session</span>
+	  <button onclick="clearStravaData()" style="background: rgba(255,255,255,0.2); color: white; padding: 8px 16px; border: 2px solid white; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s;">Clear Strava Data</button>
+	</div>
   </header>
 
   <div class="tab-container">
@@ -281,6 +292,192 @@
 	  </div>
 	</div>
   </div>
+
+  <!-- IndexedDB Storage Script - Must load before other scripts -->
+  <script>
+	// ===== INDEXEDDB STORAGE FOR ZIP DATA =====
+	const DB_NAME = 'StravaAnalyzerDB';
+	const DB_VERSION = 1;
+	const STORE_NAME = 'stravaData';
+	let db = null;
+
+	// Initialize IndexedDB
+	function initDB() {
+	  return new Promise((resolve, reject) => {
+		const request = indexedDB.open(DB_NAME, DB_VERSION);
+		
+		request.onerror = () => reject(request.error);
+		request.onsuccess = () => {
+		  db = request.result;
+		  resolve(db);
+		};
+		
+		request.onupgradeneeded = (event) => {
+		  const db = event.target.result;
+		  if (!db.objectStoreNames.contains(STORE_NAME)) {
+			db.createObjectStore(STORE_NAME);
+		  }
+		};
+	  });
+	}
+
+	async function saveToSession() {
+	  try {
+		if (!db) await initDB();
+		
+		// Convert runs to a serializable format
+		const runsToSave = window.allRuns ? window.allRuns.map(run => ({
+		  ...run,
+		  date: run.date.toISOString()
+		})) : [];
+		
+		// Prepare TCX data for storage
+		const tcxToSave = {};
+		if (window.tcxDataCache) {
+		  Object.keys(window.tcxDataCache).forEach(key => {
+			const tcxData = window.tcxDataCache[key];
+			if (tcxData && tcxData.records) {
+			  // Convert Date objects to ISO strings in records
+			  tcxToSave[key] = {
+				records: tcxData.records.map(r => ({
+				  ...r,
+				  time: r.time instanceof Date ? r.time.toISOString() : r.time
+				}))
+			  };
+			}
+		  });
+		}
+		
+		const transaction = db.transaction([STORE_NAME], 'readwrite');
+		const store = transaction.objectStore(STORE_NAME);
+		
+		await store.put(runsToSave, 'csv_runs');
+		await store.put(tcxToSave, 'tcx_cache');
+		await store.put(new Date().toISOString(), 'last_updated');
+		
+		await new Promise((resolve, reject) => {
+		  transaction.oncomplete = resolve;
+		  transaction.onerror = () => reject(transaction.error);
+		});
+		
+		console.log("✓ Data saved to IndexedDB");
+		console.log(`  Runs: ${runsToSave.length}, TCX files: ${Object.keys(tcxToSave).length}`);
+	  } catch (err) {
+		console.error("Failed to save to IndexedDB:", err);
+	  }
+	}
+
+	async function loadFromSession() {
+	  try {
+		if (!db) await initDB();
+		
+		const transaction = db.transaction([STORE_NAME], 'readonly');
+		const store = transaction.objectStore(STORE_NAME);
+		
+		const runsRequest = store.get('csv_runs');
+		const tcxRequest = store.get('tcx_cache');
+		const timeRequest = store.get('last_updated');
+		
+		const [savedRuns, savedTcx, lastUpdated] = await Promise.all([
+		  new Promise((resolve) => { runsRequest.onsuccess = () => resolve(runsRequest.result); }),
+		  new Promise((resolve) => { tcxRequest.onsuccess = () => resolve(tcxRequest.result); }),
+		  new Promise((resolve) => { timeRequest.onsuccess = () => resolve(timeRequest.result); })
+		]);
+		
+		if (savedRuns && savedRuns.length > 0) {
+		  // Restore dates as Date objects
+		  window.allRuns = savedRuns.map(run => ({
+			...run,
+			date: new Date(run.date)
+		  }));
+		  
+		  window.csvRuns = window.allRuns;
+		  window.runs = window.allRuns;
+		  
+		  // Restore TCX data with Date objects
+		  window.tcxDataCache = {};
+		  if (savedTcx) {
+			Object.keys(savedTcx).forEach(key => {
+			  const tcxData = savedTcx[key];
+			  if (tcxData && tcxData.records) {
+				window.tcxDataCache[key] = {
+				  records: tcxData.records.map(r => ({
+					...r,
+					time: new Date(r.time)
+				  }))
+				};
+			  }
+			});
+		  }
+		  
+		  console.log(`✓ Loaded ${window.allRuns.length} runs and ${Object.keys(window.tcxDataCache).length} TCX files from IndexedDB`);
+		  console.log(`  Last updated: ${lastUpdated}`);
+		  
+		  // Show session info banner
+		  const sessionInfo = document.getElementById('sessionInfo');
+		  if (sessionInfo) {
+			sessionInfo.style.display = 'flex';
+		  }
+		  
+		  // Trigger custom event for other scripts
+		  document.dispatchEvent(new CustomEvent('runs-ready', { 
+			detail: { runs: window.allRuns } 
+		  }));
+		  
+		  // Trigger analysis if the analyze function exists
+		  if (typeof window.analyze === 'function' && window.allRuns.length > 0) {
+			window.analyze(window.allRuns);
+		  }
+		  
+		  return true;
+		}
+		return false;
+	  } catch (err) {
+		console.error("Failed to load from IndexedDB:", err);
+		return false;
+	  }
+	}
+
+	async function clearSession() {
+	  try {
+		if (!db) await initDB();
+		
+		const transaction = db.transaction([STORE_NAME], 'readwrite');
+		const store = transaction.objectStore(STORE_NAME);
+		
+		store.delete('csv_runs');
+		store.delete('tcx_cache');
+		store.delete('last_updated');
+		
+		await new Promise((resolve, reject) => {
+		  transaction.oncomplete = resolve;
+		  transaction.onerror = () => reject(transaction.error);
+		});
+		
+		console.log("✓ IndexedDB data cleared");
+	  } catch (err) {
+		console.error("Failed to clear IndexedDB:", err);
+	  }
+	}
+
+	function clearAndReload() {
+	  clearSession().then(() => location.reload());
+	}
+
+	// Load saved data on page load
+	window.addEventListener('DOMContentLoaded', async () => {
+	  console.log("Page loaded, checking for saved data...");
+	  await initDB();
+	  const hasData = await loadFromSession();
+	  if (hasData) {
+		console.log("📦 Restored data from previous session");
+	  } else {
+		console.log("No saved data found");
+	  }
+	});
+
+	// Note: ZIP file upload handler is in zipHandler.js
+  </script>
 
   <!-- Application Scripts -->
   <script>
