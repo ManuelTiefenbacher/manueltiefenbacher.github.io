@@ -105,7 +105,6 @@ function initiateAuth() {
 	
 	// DEBUG: Show what redirect URI is being used
 	console.log('Redirect URI being sent:', redirectUri);
-	alert('Redirect URI: ' + redirectUri + '\n\nMake sure this EXACTLY matches your Strava API settings!');
 	
 	const scope = 'read,activity:read_all,profile:read_all';
 	

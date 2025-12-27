@@ -31,6 +31,12 @@
 	  <span style="font-weight: 600;">🏃 <span id="stravaActivityCount">0</span> Strava activities loaded from previous session</span>
 	  <button onclick="clearStravaData()" style="background: rgba(255,255,255,0.2); color: white; padding: 8px 16px; border: 2px solid white; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s;">Clear Strava Data</button>
 	</div>
+
+	<div class="progress-container" id="progressContainer">
+    <div class="progress-text" id="progressText">Processing files...</div>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
   </header>
 
   <div class="tab-container">
@@ -75,12 +81,6 @@
 			<div>
 			  <input type="file" id="zipFile" accept=".zip" style="margin-top: 1.5rem;">
 	  
-			  <div class="progress-container" id="progressContainer">
-				<div class="progress-text" id="progressText">Processing files...</div>
-				<div class="progress-bar">
-				  <div class="progress-fill" id="progressFill"></div>
-				</div>
-			  </div>
 			  <button onclick="clearZipFile()">Clear Saved ZIP</button>
 			</div>
 		  </div>
