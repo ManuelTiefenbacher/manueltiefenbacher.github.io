@@ -1,7 +1,364 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Tri Analyzer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- External Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+
 <body>
-<h1>Hello World</h1>
-<p>I'm hosted with GitHub Pages.</p>
+  <header>
+	<h1>Tri-Runalyzer</h1>
+	<p>Consistency Analysis</p>
+  </header>
+
+  <div class="tab-container">
+	<!-- Tab Navigation -->
+	<div class="tab-nav">
+	  <button class="tab-button active" onclick="switchTab('upload')">Upload Data</button>
+	  <button class="tab-button" onclick="switchTab('settings')">Settings</button>
+	  <button class="tab-button" onclick="switchTab('analysis')">Analysis</button>
+	</div>
+
+	<!-- ===== TAB 1: UPLOAD DATA ===== -->
+	<div id="tab-upload" class="tab-content active">
+	  
+		<!-- Strava ZIP Upload -->
+		<div class="panel">
+		  <h2>Strava ZIP Upload</h2>
+		  <p style="color:var(--muted);font-size:0.9rem;margin-top:8px">
+			Upload your Strava export ZIP file. The activities.csv and all TCX files will be automatically extracted and analyzed.
+		  </p>
+		  <p style="color:var(--allout);font-size:0.9rem;"">
+		    <span>&#9888;</span> Your data will not be stored	on any server; it is processed locally in your browser.
+		  </p>
+  
+		  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 1.5rem;">
+			<div class="instructions-container">
+			  <button class="instructions-toggle" onclick="this.parentElement.classList.toggle('expanded')">
+				How to get your Strava data
+				<span class="toggle-icon">▼</span>
+			  </button>
+			  <div class="instructions-content">
+				<ol>
+				  <li>Go to <a href="https://www.strava.com/athlete/delete_your_account" target="_blank">Strava Account Download page</a></li>
+				  <li>Click on "Request Your Archive" button</li>
+				  <li>You'll receive an email from Strava (usually within a few hours)</li>
+				  <li>Download the ZIP file from the link in the email</li>
+				  <li>Upload the ZIP file here - <strong>no need to extract it!</strong></li>
+				</ol>
+				<p style="margin-top: 1rem;"><strong>Note:</strong> The ZIP file contains your activities.csv and TCX files with detailed workout data including heart rate, pace, and GPS information.</p>
+			  </div>
+			</div>
+	
+			<div>
+			  <input type="file" id="zipFile" accept=".zip" style="margin-top: 1.5rem;">
+	  
+			  <div class="progress-container" id="progressContainer">
+				<div class="progress-text" id="progressText">Processing files...</div>
+				<div class="progress-bar">
+				  <div class="progress-fill" id="progressFill"></div>
+				</div>
+			  </div>
+			  <button onclick="clearZipFile()">Clear Saved ZIP</button>
+			</div>
+		  </div>
+		</div>
+
+			<!-- Strava API Connection -->
+			<div class="panel">
+			<h2>Strava API Connection</h2>
+			<p style="color:var(--muted);font-size:0.9rem;margin-top:8px">
+				Connect directly to Strava API to fetch your latest activities in real-time. 
+				You'll need to create a Strava API application to get your Client ID and Client Secret. 
+			</p>
+			<p style="color:var(--allout);font-size:0.9rem;"">
+				<span>&#9888;</span> Your data will not be stored	on any server; it is processed locally in your browser.
+			</p>
+			<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 0.5rem;">
+				<div class="instructions-container">
+					<button class="instructions-toggle" onclick="this.parentElement.classList.toggle('expanded')">
+					Connect to Strava API
+					<span class="toggle-icon">▼</span>
+					</button>
+					<div class="instructions-content">
+					<ol>
+						<p><strong>Setup Instructions:</strong></p>
+						<p>1. Go to <a href="https://www.strava.com/settings/api" target="_blank">Strava API Settings</a></p>
+						<p>2. Create an application if you haven't already</p>
+						<p>3. Set Authorization Callback Domain to: <strong>localhost</strong> (or your domain)</p>
+						<p>4. Copy your Client ID and Client Secret below</p>
+					</ol>
+				</div>
+			</div>
+
+				<div id="authSection" class="auth-section">
+					<div id="errorMessage"></div>
+					<div id="feedbackMessage"></div>
+		  
+				
+					<div class="input-group">
+						<label for="clientId">Client ID</label>
+						<input type="text" id="clientId" placeholder="Enter your Strava Client ID">
+					</div>
+
+		  
+					<div class="input-group">
+					<label for="clientSecret">Client Secret</label>
+					<input type="password" id="clientSecret" placeholder="Enter your Strava Client Secret">
+					</div>
+		  
+					<button id="connectBtn" onclick="initiateAuth()">Connect to Strava</button>
+		  
+					<div id="requestSection" style="display: none;">
+					<div class="info-box success">
+						<p><strong>✅ Connected to Strava!</strong></p>
+						<p>Click the button below to fetch your activity data.</p>
+					</div>
+					<button onclick="fetchStravaData()" style="background: #34a853;">📥 Request Data from Strava</button>
+					</div>
+				</div>
+		
+				<div id="dataSection" class="data-section">
+					<h3>Your Strava Data</h3>
+		  
+					<div id="athleteInfo" class="athlete-info"></div>
+		  
+					<h3>Recent Activities</h3>
+		  
+					<div style="display: flex; gap: 10px; margin-bottom: 15px; align-items: center; flex-wrap: wrap;">
+					<label style="font-weight: 600;">Filter by type:</label>
+					<select id="activityTypeFilter" onchange="filterActivities()">
+						<option value="all">All Activities</option>
+						<option value="Run">Runs Only</option>
+						<option value="Ride">Rides Only</option>
+						<option value="Swim">Swims Only</option>
+						<option value="Walk">Walks Only</option>
+					</select>
+					<button onclick="exportToCSV()" style="margin-left: auto; background: #34a853;">📥 Export to CSV</button>
+					</div>
+		  
+					<div id="activitiesList" class="activity-list"></div>
+		  
+					<button class="logout-btn" onclick="logout()">Disconnect</button>
+				</div>
+			</div>
+			</div>
+
+			<div class="nav-buttons">
+			<div></div>
+			<button onclick="switchTab('settings')">Next: Settings →</button>
+			</div>
+	</div>
+
+	<!-- ===== TAB 2: SETTINGS ===== -->
+	<div id="tab-settings" class="tab-content">
+	  
+	  <div class="panel">
+		<h2>Training Zones - Heart Rate</h2>
+		
+		<h3>Maximum Heart Rate</h3>
+		<div class="stats">
+		  <div class="stat">
+			<div class="label">Max HR (6 months) - extracted from activities</div>
+			<div class="value" id="maxHR">–</div>
+		  </div>
+		</div>
+		
+		<div class="zone-field">
+		  <label>Set Maximum Heart Rate manually:
+			<input id="maxHrInput" type="text" inputmode="decimal" autocomplete="off" placeholder="e.g., 180" />
+		  </label>
+		</div>
+		
+		<div class="actions">
+		  <button id="saveHrBtn">Save Max HR</button>
+		  <button id="resetHrBtn" type="button" class="secondary">Reset to Default</button>
+		  <span id="hrStatus" class="status"></span>
+		</div>
+		
+		<hr>
+		
+		<h3>Heart Rate Zone Upper Limits (%)</h3>
+		<p style="color:var(--muted);font-size:0.9rem;margin-bottom:1rem">
+		  Define the upper limits for each training zone as a percentage of your maximum heart rate.
+		</p>
+		
+		<div class="stats">
+		  <div class="zone-field">
+			<label>Zone 2 Upper Limit (%):
+			  <input id="z2UpperInputPct" type="text" inputmode="decimal" autocomplete="off" placeholder="e.g., 75" />
+			</label>
+		  </div>
+		  <div class="zone-field">
+			<label>Zone 3 Upper Limit (%):
+			  <input id="z3UpperInputPct" type="text" inputmode="decimal" autocomplete="off" placeholder="e.g., 82" />
+			</label>
+		  </div>
+		  <div class="zone-field">
+			<label>Zone 4 Upper Limit (%):
+			  <input id="z4UpperInputPct" type="text" inputmode="decimal" autocomplete="off" placeholder="e.g., 89" />
+			</label>
+		  </div>
+		  <div class="zone-field">
+			<label>Zone 5 Upper Limit (%):
+			  <input id="z5UpperInputPct" type="text" inputmode="decimal" autocomplete="off" placeholder="e.g., 100" />
+			</label>
+		  </div>
+		</div>
+		
+		<div class="actions">
+		  <button id="saveZonesBtn">Save Zones</button>
+		  <button id="resetZonesBtn" type="button" class="secondary">Reset to Default</button>
+		  <span id="zonesStatus" class="status"></span>
+		</div>
+	  </div>
+
+	  <div class="nav-buttons">
+		<button onclick="switchTab('upload')" class="secondary">← Back to Upload</button>
+		<button onclick="switchTab('analysis')">Next: Analysis →</button>
+	  </div>
+	</div>
+
+	<!-- ===== TAB 3: ANALYSIS ===== -->
+	<div id="tab-analysis" class="tab-content">
+
+	  <!-- Training Load Analysis -->
+	  <div class="panel">
+		<h2>Overview</h2>
+		<div class="stats">
+		  <div class="stat">
+			<div class="label">Runs - Last 7 Days</div>
+			<div class="value" id="runsWeek">–</div>
+		  </div>
+		  <div class="stat">
+			<div class="label">Disctance - Last 7 Days</div>
+			<div class="value" id="distanceWeek">–</div>
+		  </div>
+		  <div class="stat">
+			<div class="label">Avg Weekly km - Last 6 months)</div>
+			<div class="value" id="avgWeekly">–</div>
+		  </div>
+		  <div class="stat">
+			<div class="label">Days Since Rest Day</div>
+			<div class="value" id="restDays">–</div>
+		  </div>
+		</div>
+		<div id="trainingLoadAnalysis"></div>
+	  </div>
+
+	  <!-- Average Weekly Distance Chart -->
+	  <div class="panel">
+		<h2>Average Weekly Distance (Last 6 Months)</h2>
+		<canvas id="chart"></canvas>
+	  </div>
+
+	  <!-- Timeline -->
+	  <div class="panel">
+		<h2>Runs of Previous Four Weeks</h2>
+		<div id="timeline" class="timeline"></div>
+	  </div>
+
+	  <!-- Intensity Chart -->
+	  <div class="panel">
+		<h2>Intensity (Last 4 Weeks)</h2>
+		<canvas id="intensityChart" width="800" height="400"></canvas>
+	  </div>
+
+	  <div class="nav-buttons">
+		<button onclick="switchTab('settings')" class="secondary">← Back to Settings</button>
+		<div></div>
+	  </div>
+	</div>
+  </div>
+
+  <!-- Application Scripts -->
+  <script>
+	// ===== TAB SWITCHING WITH STATE PERSISTENCE =====
+	function switchTab(tabName) {
+	  // Hide all tabs
+	  document.querySelectorAll('.tab-content').forEach(tab => {
+		tab.classList.remove('active');
+	  });
+	  
+	  // Remove active class from all buttons
+	  document.querySelectorAll('.tab-button').forEach(btn => {
+		btn.classList.remove('active');
+	  });
+	  
+	  // Show selected tab
+	  document.getElementById('tab-' + tabName).classList.add('active');
+	  
+	  // Activate corresponding button
+	  event.target.classList.add('active');
+	  
+	  // Save current tab to localStorage
+	  localStorage.setItem('currentTab', tabName);
+	  
+	  // Scroll to top
+	  window.scrollTo({ top: 0, behavior: 'smooth' });
+	}
+
+	// ===== RESTORE LAST ACTIVE TAB ON PAGE LOAD =====
+	window.addEventListener('DOMContentLoaded', () => {
+	  const savedTab = localStorage.getItem('currentTab');
+	  if (savedTab && ['upload', 'settings', 'analysis'].includes(savedTab)) {
+		// Hide all tabs first
+		document.querySelectorAll('.tab-content').forEach(tab => {
+		  tab.classList.remove('active');
+		});
+		document.querySelectorAll('.tab-button').forEach(btn => {
+		  btn.classList.remove('active');
+		});
+		
+		// Activate saved tab
+		document.getElementById('tab-' + savedTab).classList.add('active');
+		document.querySelector(`[onclick="switchTab('${savedTab}')"]`).classList.add('active');
+	  }
+	});
+
+	// ===== PLACEHOLDER FUNCTIONS FOR EXTERNAL SCRIPTS =====
+	function initiateAuth() {
+	  console.log('Initiate Strava authentication');
+	}
+
+	function fetchStravaData() {
+	  console.log('Fetch Strava data');
+	}
+
+	function filterActivities() {
+	  console.log('Filter activities');
+	}
+
+	function exportToCSV() {
+	  console.log('Export to CSV');
+	}
+
+	function logout() {
+	  console.log('Logout from Strava');
+	}
+  </script>
+
+  <script src="app.js"></script>
+  <script src="tcxParser.js"></script>
+  <script src="analyzeMain.js"></script>
+  <script src="renderAverageDistanceChart.js"></script>
+  <script src="renderTimelineChart.js"></script>
+  <script src="renderIntensityChart.js"></script>
+  <script src="zipHandler.js"></script>
+  <script src="readZones.js"></script>
+  <script src="stravaAuthHandler.js"></script>
+  <script src="renderBasicInfo.js"></script>
+  <script src="renderTrafficLights.js"></script>
 </body>
 </html>
