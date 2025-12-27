@@ -71,6 +71,11 @@ function initiateAuth() {
 	sessionStorage.setItem('stravaClientSecret', clientSecret);
 	
 	const redirectUri = window.location.origin + window.location.pathname;
+	
+	// DEBUG: Show what redirect URI is being used
+	console.log('Redirect URI being sent:', redirectUri);
+	alert('Redirect URI: ' + redirectUri + '\n\nMake sure this EXACTLY matches your Strava API settings!');
+	
 	const scope = 'read,activity:read_all,profile:read_all';
 	
 	const authUrl = `https://www.strava.com/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&approval_prompt=force&scope=${scope}`;
