@@ -59,15 +59,10 @@ function renderIntensityChart(runsParam) {
   let totalDistance = 0;
 
   last28DaysRuns.forEach((r, idx) => {
-    console.log(`\n--- Checking run ${idx + 1}/${last28DaysRuns.length} ---`);
-    console.log('Run ID:', r.id);
-    console.log('Has hrStream?', !!r.hrStream);
     
     // Check for hrStream (new unified format)
     if (r.hrStream && r.hrStream.heartrate && Array.isArray(r.hrStream.heartrate)) {
       const hrData = r.hrStream.heartrate;
-      console.log('HR stream found with', hrData.length, 'data points');
-      console.log('First 3 HR values:', hrData.slice(0, 3));
       
       runsWithDetailedData++;
       totalDistance += r.distance || 0;
@@ -75,7 +70,6 @@ function renderIntensityChart(runsParam) {
       const runDataPoints = [];
       hrData.forEach((hr, recIdx) => {
         if (recIdx < 3) {
-          console.log(`HR point ${recIdx}:`, hr);
         }
         
         if (hr && hr > 0) {

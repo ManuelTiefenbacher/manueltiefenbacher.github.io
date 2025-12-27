@@ -336,6 +336,7 @@ async function fetchStravaData() {
 		}
 		
 		analyze(stravaRuns, 'Strava');
+		setupScanButton();
 		
 		const hrCount = stravaRuns.filter(r => r.hrStream).length;
 		showFeedback(
