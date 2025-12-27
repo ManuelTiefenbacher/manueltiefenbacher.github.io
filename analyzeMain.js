@@ -4,22 +4,23 @@ let allRuns = [];
 function analyze(newRuns, source = 'unknown') {
 
 	console.log(`Analyzing ${newRuns.length} runs from ${source}`);
+
 	const now = new Date();
 	const sixMonthsAgo = new Date();
 	sixMonthsAgo.setMonth(now.getMonth() - 6);
   
 	// Combine and remove duplicates based on ID
-	const combinedRuns = [...oldRuns, ...newRuns];
+	const combinedRuns = [...allRuns, ...newRuns];
 	
-	// Remove duplicates - keep the first occurrence (CSV has priority)
+	// Remove duplicates - keep LAST occurrence (so later loads win)
 	const uniqueRuns = combinedRuns.filter((run, index, self) => 
-	  index === self.findIndex(r => r.id === run.id)
+	  index === self.findLastIndex(r => r.id === run.id)
 	);
 	
-	allRuns = uniqueRuns;
-	oldRuns = uniqueRuns; // Store for next call
 	
-	console.log(`Total runs: ${combinedRuns.length}, Unique runs: ${uniqueRuns.length}`);
+	allRuns = uniqueRuns;
+	
+	console.log(`Total unique runs: ${allRuns.length}`);
 	
 	// Check if tcxDataCache is available
 	console.log('TCX data available:', Object.keys(window.tcxDataCache || {}).length, 'files');
