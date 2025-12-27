@@ -1,3 +1,6 @@
+let oldRuns = [];
+let allRuns = [];
+
 function analyze(newRuns) {
 	const now = new Date();
 	const sixMonthsAgo = new Date();
@@ -5,14 +8,15 @@ function analyze(newRuns) {
   
 	// Combine and remove duplicates based on ID
 	const combinedRuns = [...oldRuns, ...newRuns];
+	
 	// Remove duplicates - keep the first occurrence (CSV has priority)
 	const uniqueRuns = combinedRuns.filter((run, index, self) => 
 	  index === self.findIndex(r => r.id === run.id)
 	);
-	allRuns = uniqueRuns;
-	oldRuns = allRuns;
 	
-	// Fixed console.log (was missing opening backtick)
+	allRuns = uniqueRuns;
+	oldRuns = uniqueRuns; // Store for next call
+	
 	console.log(`Total runs: ${combinedRuns.length}, Unique runs: ${uniqueRuns.length}`);
 	
 	// Check if tcxDataCache is available
