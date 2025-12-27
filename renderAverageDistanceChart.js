@@ -176,8 +176,8 @@ function calculateWeeklyZoneData(runs, zones) {
     const hasBasicHR = run.avgHR > 0 && run.maxHR > 0;
     let detailedHR = null;
     
-    if (run.filename && tcxDataCache[run.filename]) {
-      detailedHR = analyzeDetailedHR(tcxDataCache[run.filename], zones);
+    if (run.filename && window.tcxDataCache[run.filename]) {
+      detailedHR = analyzeDetailedHR(window.tcxDataCache[run.filename], zones);
     }
     
     if (!hasBasicHR && !detailedHR) {

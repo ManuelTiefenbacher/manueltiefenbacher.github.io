@@ -251,8 +251,11 @@ function classify(r, avgWeekly, zones) {
   let detailedHR = null;
   let hrDataType = 'none';
   
-  if (r.filename && tcxDataCache[r.filename]) {
-    detailedHR = analyzeDetailedHR(tcxDataCache[r.filename], zones);
+  console.log(r.filename);
+  console.log(window.tcxDataCache[r.filename]);
+
+  if (r.filename && window.tcxDataCache[r.filename]) {
+    detailedHR = analyzeDetailedHR(window.tcxDataCache[r.filename], zones);
     if (detailedHR) {
       hrDataType = 'detailed';
     }
