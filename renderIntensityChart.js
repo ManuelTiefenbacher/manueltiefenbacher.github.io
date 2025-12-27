@@ -4,8 +4,6 @@ function renderIntensityChart(runsParam) {
 
   console.log('=== INTENSITY CHART DEBUG ===');
   console.log('Total runs passed:', runs.length);
-  console.log('tcxDataCache keys:', Object.keys(window.tcxDataCache || {}));
-  console.log('tcxDataCache:', window.tcxDataCache);
   
   // Get zone boundaries from window and convert to numbers
   const z2 = Number(window.z2Upper);
@@ -62,31 +60,22 @@ function renderIntensityChart(runsParam) {
 
   last28DaysRuns.forEach((r, idx) => {
     console.log(`\n--- Checking run ${idx + 1}/${last28DaysRuns.length} ---`);
-    console.log('Run filename:', r.filename);
-    console.log('Has filename?', !!r.filename);
+    console.log('Run ID:', r.id);
+    console.log('Has hrStream?', !!r.hrStream);
     
-    const tcxData = r.filename ? window.tcxDataCache[r.filename] : null;
-    console.log('TCX data found?', !!tcxData);
-    
-    if (tcxData) {
-      console.log('TCX data structure:', tcxData);
-      console.log('Has records array?', Array.isArray(tcxData.records));
-      if (Array.isArray(tcxData.records)) {
-        console.log('Number of records:', tcxData.records.length);
-        console.log('First 3 records:', tcxData.records.slice(0, 3));
-      }
-    }
-    
-    if (tcxData && Array.isArray(tcxData.records)) {
+    // Check for hrStream (new unified format)
+    if (r.hrStream && r.hrStream.heartrate && Array.isArray(r.hrStream.heartrate)) {
+      const hrData = r.hrStream.heartrate;
+      console.log('HR stream found with', hrData.length, 'data points');
+      console.log('First 3 HR values:', hrData.slice(0, 3));
+      
       runsWithDetailedData++;
       totalDistance += r.distance || 0;
       
       const runDataPoints = [];
-      tcxData.records.forEach((record, recIdx) => {
-        const hr = record?.heart_rate;
-        
+      hrData.forEach((hr, recIdx) => {
         if (recIdx < 3) {
-          console.log(`Record ${recIdx}:`, record, 'HR:', hr);
+          console.log(`HR point ${recIdx}:`, hr);
         }
         
         if (hr && hr > 0) {
@@ -111,6 +100,10 @@ function renderIntensityChart(runsParam) {
           bucketDistances[idx] += (r.distance || 0) / runDataPoints.length;
         });
       }
+      
+      console.log(`Processed ${runDataPoints.length} valid HR points for this run`);
+    } else {
+      console.log('No HR stream data for this run');
     }
   });
 
@@ -263,7 +256,7 @@ function renderIntensityChart(runsParam) {
               
               return `
 ━━━━━━━━━━━━━━━━━━━━━━━━
-${runsWithDetailedData} runs with TCX data
+${runsWithDetailedData} runs with HR stream data
 Total: ${totalDistance.toFixed(1)} km
 Low intensity (Z1-Z2): ${lowIntensity.toFixed(1)} km
 High intensity (Z4-Z6): ${highIntensity.toFixed(1)} km

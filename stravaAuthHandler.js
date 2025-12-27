@@ -214,24 +214,51 @@ async function fetchStravaData() {
 		
 		const athlete = await athleteResponse.json();
 		
-		// Fetch activities list
-		const activitiesResponse = await fetch('https://www.strava.com/api/v3/athlete/activities?per_page=30', {
-			headers: {
-				'Authorization': `Bearer ${accessToken}`
-			}
-		});
+		// Fetch activities with pagination - get last 200 activities (or adjust as needed)
+		const allActivities = [];
+		const perPage = 200; // Max is 200 per page
+		const maxPages = 3; // Fetch 1 page = 200 activities (adjust if you want more)
 		
-		if (!activitiesResponse.ok) {
-			throw new Error(`Activities fetch failed: ${activitiesResponse.status}`);
+		for (let page = 1; page <= maxPages; page++) {
+			showFeedback(`⏳ Fetching activities (page ${page}/${maxPages})...`, 'info');
+			
+			const activitiesResponse = await fetch(
+				`https://www.strava.com/api/v3/athlete/activities?per_page=${perPage}&page=${page}`,
+				{
+					headers: {
+						'Authorization': `Bearer ${accessToken}`
+					}
+				}
+			);
+			
+			if (!activitiesResponse.ok) {
+				throw new Error(`Activities fetch failed: ${activitiesResponse.status}`);
+			}
+			
+			const pageActivities = await activitiesResponse.json();
+			
+			// If we get fewer activities than requested, we've reached the end
+			if (pageActivities.length === 0) {
+				break;
+			}
+			
+			allActivities.push(...pageActivities);
+			
+			// If we got fewer than perPage, we've reached the end
+			if (pageActivities.length < perPage) {
+				break;
+			}
 		}
 		
-		const activitiesList = await activitiesResponse.json();
+		// Filter for runs only (before fetching details to save API calls)
+		const activitiesList = allActivities.filter(a => a.type === "Run");
 		
 		showFeedback(`⏳ Fetching detailed data for ${activitiesList.length} activities...`, 'info');
 		
-		// Fetch detailed data for each activity
+		// Fetch detailed data AND heart rate streams for each activity
 		const detailedActivities = await Promise.all(
 			activitiesList.map(async (activity) => {
+				// Fetch detailed activity data
 				const detailResponse = await fetch(`https://www.strava.com/api/v3/activities/${activity.id}`, {
 					headers: {
 						'Authorization': `Bearer ${accessToken}`
@@ -240,25 +267,56 @@ async function fetchStravaData() {
 				
 				if (!detailResponse.ok) {
 					console.warn(`Failed to fetch details for activity ${activity.id}`);
-					return activity; // Return basic data if detailed fetch fails
+					return { ...activity, hrStream: null };
 				}
 				
-				return await detailResponse.json();
+				const detailData = await detailResponse.json();
+				
+				// Fetch heart rate stream data
+				let hrStream = null;
+				try {
+					const streamResponse = await fetch(
+						`https://www.strava.com/api/v3/activities/${activity.id}/streams?keys=heartrate,time&key_by_type=true`,
+						{
+							headers: {
+								'Authorization': `Bearer ${accessToken}`
+							}
+						}
+					);
+					
+					if (streamResponse.ok) {
+						const streamData = await streamResponse.json();
+						// streamData will have format: { heartrate: { data: [...] }, time: { data: [...] } }
+						if (streamData.heartrate && streamData.time) {
+							hrStream = {
+								heartrate: streamData.heartrate.data,
+								time: streamData.time.data
+							};
+						}
+					}
+				} catch (err) {
+					console.warn(`Failed to fetch HR stream for activity ${activity.id}:`, err);
+				}
+				
+				return { ...detailData, hrStream };
 			})
 		);
+		
 		stravaData = detailedActivities;
 		
 		const stravaRuns = stravaData
 			.filter(r => r.type === "Run")
 			.map(r => ({
-				id: r.id, // Keep the Strava ID
+				id: r.id,
 				date: new Date(r.start_date),
 				distance: r.distance / 1000,
 				duration: r.moving_time / 60,
 				avgHR: r.average_heartrate || null,
-				maxHR: r.max_heartrate || null
-		}))
-		.filter(r => r.distance && r.duration && !isNaN(r.date.getTime()));
+				maxHR: r.max_heartrate || null,
+				// Add detailed HR data if available
+				hrStream: r.hrStream || null
+			}))
+			.filter(r => r.distance && r.duration && !isNaN(r.date.getTime()));
 		
 		// Save the processed data to sessionStorage
 		sessionStorage.setItem('stravaData', JSON.stringify(stravaRuns));
@@ -266,9 +324,24 @@ async function fetchStravaData() {
 		console.log("after Strava Fetch");
 		console.log(stravaRuns);
 		
+		// Log sample HR stream data for first activity with HR data
+		const firstWithHR = stravaRuns.find(r => r.hrStream);
+		if (firstWithHR) {
+			console.log("Sample HR stream data:", {
+				activityId: firstWithHR.id,
+				hrDataPoints: firstWithHR.hrStream.heartrate.length,
+				sampleHR: firstWithHR.hrStream.heartrate.slice(0, 10),
+				sampleTime: firstWithHR.hrStream.time.slice(0, 10)
+			});
+		}
+		
 		analyze(stravaRuns, 'Strava');
 		
-		showFeedback(`✅ Successfully fetched ${detailedActivities.length} activities from Strava!`, 'success');
+		const hrCount = stravaRuns.filter(r => r.hrStream).length;
+		showFeedback(
+			`✅ Successfully fetched ${detailedActivities.length} activities from Strava! (${hrCount} with detailed HR data)`,
+			'success'
+		);
 	} catch (err) {
 		console.error('Strava fetch error:', err);
 		showFeedback(`❌ Error fetching Strava data: ${err.message}`, 'error');

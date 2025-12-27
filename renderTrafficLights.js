@@ -12,9 +12,9 @@ function analyzeTrainingLoad(runs) {
   const last14Days = runs.filter(r => (now - r.date) / 86400000 <= 14);
   const last28Days = runs.filter(r => (now - r.date) / 86400000 <= 28);
 
-  // Classify all recent runs
+  // Classify all recent runs using new HR format
   const classifyRun = (r) => {
-    const result = classify(r, 0, zones); // avgWeekly not needed for classification
+    const result = classifyWithNewFormat(r, 0, zones); // avgWeekly not needed for classification
     return result.category.split(' (')[0]; // Remove tendency indicators
   };
 
@@ -43,6 +43,133 @@ function analyzeTrainingLoad(runs) {
   };
 
   return analysis;
+}
+
+// Helper function to classify runs with new HR format
+function classifyWithNewFormat(r, avgWeekly, zones) {
+  const hasBasicHR = r.avgHR > 0 && r.maxHR > 0;
+  let detailedHR = null;
+  let hrDataType = 'none';
+
+  // Check for hrStream (new unified format)
+  if (r.hrStream && r.hrStream.heartrate && r.hrStream.heartrate.length > 0) {
+    detailedHR = analyzeDetailedHRForClassification(r.hrStream, zones);
+    if (detailedHR) {
+      hrDataType = 'detailed';
+    }
+  }
+  
+  if (hrDataType === 'none' && hasBasicHR) {
+    hrDataType = 'basic';
+  }
+
+  // If no HR data at all, return Mixed
+  if (hrDataType === 'none') {
+    return {
+      category: "Mixed Effort",
+      hrDataType: 'none'
+    };
+  }
+
+  let category = "Mixed Effort";
+  let tendency = "";
+
+  // Use detailed HR data if available, otherwise fall back to basic HR
+  if (detailedHR) {
+    const timeAboveZ4 = detailedHR.percentZ5 + detailedHR.percentZ6;
+    const timeZ3toZ5 = detailedHR.percentZ3 + detailedHR.percentZ4 + detailedHR.percentZ5;
+    const timeZ5Z6 = detailedHR.percentZ5 + detailedHR.percentZ6;
+    
+    // Z2: 75% in Z2 & ≤5% above Z4
+    if (detailedHR.percentZ2 >= 75 && timeAboveZ4 <= 5) {
+      category = "Z2";
+    }
+    // Race: 80% in Z5-Z6
+    else if (timeZ5Z6 >= 80) {
+      category = "Race Effort";
+    }
+    // Intensity: 80% in Z3-Z5
+    else if (timeZ3toZ5 >= 80) {
+      category = "Intensity Effort";
+    }
+    else {
+      category = "Mixed Effort";
+    }
+  } else {
+    // Basic HR fallback classification
+    const avgZone = getZoneForClassification(r.avgHR, zones);
+    const maxZone = getZoneForClassification(r.maxHR, zones);
+    
+    if (avgZone === 2 && maxZone <= 4) {
+      category = "Z2";
+    } else if (avgZone >= 5) {
+      category = "Race Effort";
+    } else if (avgZone === 3 || avgZone === 4) {
+      category = "Intensity Effort";
+    } else {
+      category = "Mixed Effort";
+    }
+  }
+
+  return {
+    category: category + tendency,
+    hrDataType: hrDataType
+  };
+}
+
+function analyzeDetailedHRForClassification(hrStream, zones) {
+  if (!hrStream || !hrStream.heartrate || hrStream.heartrate.length === 0) {
+    return null;
+  }
+  
+  const hrRecords = hrStream.heartrate.filter(hr => hr && hr > 0);
+  
+  if (hrRecords.length === 0) {
+    return null;
+  }
+  
+  let timeZ1 = 0;
+  let timeZ2 = 0;
+  let timeZ3 = 0;
+  let timeZ4 = 0;
+  let timeZ5 = 0;
+  let timeZ6 = 0;
+  let totalTime = hrRecords.length;
+  
+  const z1Upper = zones.z2Upper * 0.8;
+  
+  hrRecords.forEach(hr => {
+    if (hr <= z1Upper) {
+      timeZ1++;
+    } else if (hr <= zones.z2Upper) {
+      timeZ2++;
+    } else if (hr <= zones.z3Upper) {
+      timeZ3++;
+    } else if (hr <= zones.z4Upper) {
+      timeZ4++;
+    } else if (hr <= zones.z5Upper) {
+      timeZ5++;
+    } else {
+      timeZ6++;
+    }
+  });
+  
+  return {
+    percentZ1: (timeZ1 / totalTime) * 100,
+    percentZ2: (timeZ2 / totalTime) * 100,
+    percentZ3: (timeZ3 / totalTime) * 100,
+    percentZ4: (timeZ4 / totalTime) * 100,
+    percentZ5: (timeZ5 / totalTime) * 100,
+    percentZ6: (timeZ6 / totalTime) * 100
+  };
+}
+
+function getZoneForClassification(hr, zones) {
+  if (hr <= zones.z2Upper) return 2;
+  if (hr <= zones.z3Upper) return 3;
+  if (hr <= zones.z4Upper) return 4;
+  if (hr <= zones.z5Upper) return 5;
+  return 6;
 }
 
 function analyzeRecovery(last7, last14, last7Runs) {

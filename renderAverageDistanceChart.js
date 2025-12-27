@@ -172,12 +172,13 @@ function calculateWeeklyZoneData(runs, zones) {
     const weekData = weekMap.get(weekKey);
     weekData.total += run.distance;
     
-    // Check if run has HR data
+    // Check if run has HR data using new format
     const hasBasicHR = run.avgHR > 0 && run.maxHR > 0;
     let detailedHR = null;
     
-    if (run.filename && window.tcxDataCache[run.filename]) {
-      detailedHR = analyzeDetailedHR(window.tcxDataCache[run.filename], zones);
+    // Check for hrStream (new unified format)
+    if (run.hrStream && run.hrStream.heartrate && run.hrStream.heartrate.length > 0) {
+      detailedHR = analyzeDetailedHR(run.hrStream, zones);
     }
     
     if (!hasBasicHR && !detailedHR) {
@@ -201,6 +202,69 @@ function calculateWeeklyZoneData(runs, zones) {
   
   // Convert map to sorted array
   return Array.from(weekMap.values()).sort((a, b) => a.weekStart - b.weekStart);
+}
+
+// Helper function to analyze detailed HR data (unified format)
+function analyzeDetailedHR(hrStream, zones) {
+  // New unified format: hrStream = { heartrate: [...], time: [...] }
+  if (!hrStream || !hrStream.heartrate || hrStream.heartrate.length === 0) {
+    return null;
+  }
+  
+  const hrRecords = hrStream.heartrate.filter(hr => hr && hr > 0);
+  
+  if (hrRecords.length === 0) {
+    return null;
+  }
+  
+  // Calculate time in each zone
+  let timeZ1 = 0;
+  let timeZ2 = 0;
+  let timeZ3 = 0;
+  let timeZ4 = 0;
+  let timeZ5 = 0;
+  let timeZ6 = 0;
+  let totalTime = hrRecords.length;
+  
+  // Estimate Z1 upper as anything below Z2
+  const z1Upper = zones.z2Upper * 0.8;
+  
+  hrRecords.forEach(hr => {
+    if (hr <= z1Upper) {
+      timeZ1++;
+    } else if (hr <= zones.z2Upper) {
+      timeZ2++;
+    } else if (hr <= zones.z3Upper) {
+      timeZ3++;
+    } else if (hr <= zones.z4Upper) {
+      timeZ4++;
+    } else if (hr <= zones.z5Upper) {
+      timeZ5++;
+    } else {
+      timeZ6++;
+    }
+  });
+  
+  return {
+    percentZ1: (timeZ1 / totalTime) * 100,
+    percentZ2: (timeZ2 / totalTime) * 100,
+    percentZ3: (timeZ3 / totalTime) * 100,
+    percentZ4: (timeZ4 / totalTime) * 100,
+    percentZ5: (timeZ5 / totalTime) * 100,
+    percentZ6: (timeZ6 / totalTime) * 100,
+    avgHR: hrRecords.reduce((a,b) => a+b, 0) / hrRecords.length,
+    maxHR: Math.max(...hrRecords),
+    totalRecords: totalTime
+  };
+}
+
+// Helper function to get zone from HR value
+function getZone(hr, zones) {
+  if (hr <= zones.z2Upper) return 2;
+  if (hr <= zones.z3Upper) return 3;
+  if (hr <= zones.z4Upper) return 4;
+  if (hr <= zones.z5Upper) return 5;
+  return 6;
 }
 
 // Helper function to get the start of the week (Monday)

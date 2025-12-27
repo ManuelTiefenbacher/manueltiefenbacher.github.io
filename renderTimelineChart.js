@@ -15,7 +15,7 @@ function renderTimeline(runs, avgWeekly) {
   console.log('HR_MAX:', HR_MAX);
 
   runs
-    .filter(r => (new Date()-r.date)/86400000<=28)
+    .filter(r => (new Date()-r.date)/86400000<=700)
     .sort((a,b)=>b.date-a.date)
     .forEach(r => {
       const classificationResult = classify(r, avgWeekly, zones);
@@ -246,18 +246,17 @@ function generateHRGraph(hrRecords, zones) {
 function classify(r, avgWeekly, zones) {
   const isLong = r.distance > (0.5 * avgWeekly);
 
-  // Determine HR data type
+  // Determine HR data type using new format
   const hasBasicHR = r.avgHR > 0 && r.maxHR > 0;
   let detailedHR = null;
   let hrDataType = 'none';
-  
-  console.log(r.filename);
-  console.log(window.tcxDataCache[r.filename]);
 
-  if (r.filename && window.tcxDataCache[r.filename]) {
-    detailedHR = analyzeDetailedHR(window.tcxDataCache[r.filename], zones);
+  // Check for hrStream (new unified format for both Strava and ZIP)
+  if (r.hrStream && r.hrStream.heartrate && r.hrStream.heartrate.length > 0) {
+    detailedHR = analyzeDetailedHR(r.hrStream, zones);
     if (detailedHR) {
       hrDataType = 'detailed';
+      console.log(`Run ${r.id} has detailed HR data (${r.hrStream.heartrate.length} points)`);
     }
   }
   
@@ -343,14 +342,21 @@ function classify(r, avgWeekly, zones) {
   };
 }
 
-function analyzeDetailedHR(tcxData, zones) {
-  if (!tcxData || !tcxData.records) return null;
+function analyzeDetailedHR(hrStream, zones) {
+  // New unified format: hrStream = { heartrate: [...], time: [...] }
+  if (!hrStream || !hrStream.heartrate || hrStream.heartrate.length === 0) {
+    console.warn('No HR stream data available');
+    return null;
+  }
   
-  const hrRecords = tcxData.records
-    .filter(r => r.heart_rate && r.heart_rate > 0)
-    .map(r => r.heart_rate);
+  const hrRecords = hrStream.heartrate.filter(hr => hr && hr > 0);
   
-  if (hrRecords.length === 0) return null;
+  if (hrRecords.length === 0) {
+    console.warn('No valid HR records after filtering');
+    return null;
+  }
+  
+  console.log(`Analyzing ${hrRecords.length} HR records`);
   
   // Calculate time in each zone
   let timeZ1 = 0; // Below Z2 lower (we don't have Z1 upper, so assume < 60% of Z2Upper)
@@ -380,7 +386,7 @@ function analyzeDetailedHR(tcxData, zones) {
     }
   });
   
-  return {
+  const result = {
     percentZ1: (timeZ1 / totalTime) * 100,
     percentZ2: (timeZ2 / totalTime) * 100,
     percentZ3: (timeZ3 / totalTime) * 100,
@@ -392,4 +398,12 @@ function analyzeDetailedHR(tcxData, zones) {
     totalRecords: totalTime,
     hrRecords: hrRecords // Include raw HR data for graphing
   };
+  
+  console.log('HR analysis result:', {
+    avgHR: result.avgHR.toFixed(1),
+    maxHR: result.maxHR,
+    z2Percent: result.percentZ2.toFixed(1)
+  });
+  
+  return result;
 }

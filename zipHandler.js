@@ -115,10 +115,10 @@ async function processZipFile(file) {
         // Decompress using pako
         const tcxData = pako.ungzip(gzData, { to: 'string' });
         
-        // Parse TCX
+        // Parse TCX with Strava-compatible format
         const parsedTcx = parseTcxFile(tcxData);
         
-        if (parsedTcx && parsedTcx.records && parsedTcx.records.length > 0) {
+        if (parsedTcx && parsedTcx.hrStream && parsedTcx.hrStream.heartrate.length > 0) {
           // Extract activity ID from filename
           const activityId = filename.split('/').pop().replace('.tcx.gz', '');
           
@@ -130,8 +130,9 @@ async function processZipFile(file) {
           
           if (matchingRuns.length > 0) {
             matchedCount++;
-            window.tcxDataCache[matchingRuns[0].filename] = parsedTcx;
-            console.log(`✓ Matched ${activityId} (${parsedTcx.records.length} HR records)`);
+            // Store hrStream directly on the run object (like Strava format)
+            matchingRuns[0].hrStream = parsedTcx.hrStream;
+            console.log(`✓ Matched ${activityId} (${parsedTcx.hrStream.heartrate.length} HR records)`);
           }
         }
         
@@ -146,6 +147,17 @@ async function processZipFile(file) {
     
     console.log(`TCX-Verarbeitung abgeschlossen: ${processedCount} verarbeitet, ${matchedCount} zugeordnet`);
     
+    // Log sample for debugging
+    const firstWithHR = window.allRuns.find(r => r.hrStream);
+    if (firstWithHR) {
+      console.log("Sample ZIP HR stream data:", {
+        runId: firstWithHR.id,
+        hrDataPoints: firstWithHR.hrStream.heartrate.length,
+        sampleHR: firstWithHR.hrStream.heartrate.slice(0, 10),
+        sampleTime: firstWithHR.hrStream.time.slice(0, 10)
+      });
+    }
+    
     // Save to IndexedDB after TCX processing
     if (typeof saveToSession === 'function') {
       await saveToSession();
@@ -154,7 +166,8 @@ async function processZipFile(file) {
     // Re-analyze with TCX data AFTER saving
     if (window.allRuns.length > 0) {
       if (typeof analyze === 'function') {
-        console.log('Calling analyze() with', window.allRuns.length, 'runs and', Object.keys(window.tcxDataCache).length, 'TCX files');
+        const hrCount = window.allRuns.filter(r => r.hrStream).length;
+        console.log('Calling analyze() with', window.allRuns.length, 'runs and', hrCount, 'with HR data');
         analyze(window.allRuns, 'Zip Stored');
       }
     }
@@ -185,7 +198,8 @@ async function parseCSV(data) {
         duration: +r["Moving Time"],
         avgHR: +r["Average Heart Rate"],
         maxHR: +r["Max Heart Rate"],
-        filename: r["Filename"]
+        filename: r["Filename"],
+        hrStream: null  // Initialize hrStream, will be populated from TCX
       }))
       .filter(r => r.distance && r.duration && !isNaN(r.date.getTime()));
 
@@ -229,21 +243,42 @@ function parseTcxFile(tcxText) {
     const doc = parser.parseFromString(tcxText, "text/xml");
     
     const trackpoints = doc.getElementsByTagName("Trackpoint");
-    const records = [];
+    const heartrate = [];
+    const time = [];
+    let startTime = null;
     
     for (let tp of trackpoints) {
       const timeEl = tp.getElementsByTagName("Time")[0];
       const hrEl = tp.getElementsByTagName("Value")[0];
       
       if (timeEl && hrEl) {
-        records.push({
-          time: new Date(timeEl.textContent),
-          heart_rate: parseInt(hrEl.textContent)  // ← Changed from 'hr' to 'heart_rate'
-        });
+        const timestamp = new Date(timeEl.textContent);
+        const hr = parseInt(hrEl.textContent);
+        
+        // Set start time from first trackpoint
+        if (startTime === null) {
+          startTime = timestamp;
+        }
+        
+        // Calculate elapsed seconds from start
+        const elapsedSeconds = Math.floor((timestamp - startTime) / 1000);
+        
+        heartrate.push(hr);
+        time.push(elapsedSeconds);
       }
     }
     
-    return { records };
+    // Return in Strava-compatible format
+    if (heartrate.length > 0) {
+      return {
+        hrStream: {
+          heartrate: heartrate,
+          time: time
+        }
+      };
+    }
+    
+    return null;
   } catch (err) {
     console.error("TCX parse error:", err);
     return null;
