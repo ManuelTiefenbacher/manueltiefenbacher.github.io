@@ -1,7 +1,9 @@
 let oldRuns = [];
 let allRuns = [];
 
-function analyze(newRuns) {
+function analyze(newRuns, source = 'unknown') {
+
+	console.log(`Analyzing ${newRuns.length} runs from ${source}`);
 	const now = new Date();
 	const sixMonthsAgo = new Date();
 	sixMonthsAgo.setMonth(now.getMonth() - 6);

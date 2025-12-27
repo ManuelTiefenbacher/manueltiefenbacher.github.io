@@ -89,7 +89,7 @@ async function processZipFile(file) {
       // Call analyze even without TCX data
       if (window.allRuns.length > 0 && typeof analyze === 'function') {
         console.log('Calling analyze() with', window.allRuns.length, 'runs (no TCX data)');
-        analyze(window.allRuns);
+        analyze(window.allRuns, 'Zip No TCX');
       }
       
       setTimeout(() => {
@@ -155,7 +155,7 @@ async function processZipFile(file) {
     if (window.allRuns.length > 0) {
       if (typeof analyze === 'function') {
         console.log('Calling analyze() with', window.allRuns.length, 'runs and', Object.keys(window.tcxDataCache).length, 'TCX files');
-        analyze(window.allRuns);
+        analyze(window.allRuns, 'Zip Stored');
       }
     }
     
@@ -214,7 +214,7 @@ async function parseCSV(data) {
     // Trigger analysis if function exists
     if (typeof analyze === 'function') {
       console.log('Calling analyze() after CSV parse with', runs.length, 'runs');
-      analyze(runs);
+      analyze(runs, 'Zip');
     }
   } catch(e) {
     console.error("Parse error:", e);

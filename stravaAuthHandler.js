@@ -49,7 +49,7 @@ function restoreSavedData() {
 				}));
 				
 				// Call analyze with the restored data
-				analyze(stravaRuns);
+				analyze(stravaRuns, 'Strava Restore');
 				
 				// Show session info banner instead of feedback message
 				showStravaSessionBanner(stravaRuns.length);
@@ -267,7 +267,7 @@ async function fetchStravaData() {
 		console.log("after Strava Fetch");
 		console.log(stravaRuns);
 		
-		analyze(stravaRuns);
+		analyze(stravaRuns, 'Strava');
 		
 		showFeedback(`✅ Successfully fetched ${detailedActivities.length} activities from Strava!`, 'success');
 	} catch (err) {
