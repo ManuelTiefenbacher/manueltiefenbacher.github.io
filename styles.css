@@ -1,4 +1,4 @@
-/* ===== CSS VARIABLES ===== */
+﻿/* ===== CSS VARIABLES ===== */
 :root {
     --bg: #0a0c10;
     --panel: #13151c;
@@ -1344,4 +1344,388 @@ hr {
     margin-right: 8px;
     font-weight: 400;
   }
+}
+
+/* ===== TRAINING LOAD ANALYSIS TOOLTIPS ===== */
+/* Add this section to your existing styles.css */
+
+.training-analysis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+  margin: 20px 0;
+}
+
+.analysis-card {
+  position: relative;
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: var(--shadow);
+  border-left: 4px solid var(--muted);
+  transition: all 0.3s ease;
+}
+
+.analysis-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.analysis-card.green {
+  border-left-color: #34a853;
+  background: linear-gradient(135deg, rgba(52, 168, 83, 0.1) 0%, var(--panel) 100%);
+}
+
+.analysis-card.yellow {
+  border-left-color: #fbbc04;
+  background: linear-gradient(135deg, rgba(251, 188, 4, 0.1) 0%, var(--panel) 100%);
+}
+
+.analysis-card.red {
+  border-left-color: #ea4335;
+  background: linear-gradient(135deg, rgba(234, 67, 53, 0.1) 0%, var(--panel) 100%);
+}
+
+.analysis-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  position: relative;
+}
+
+.status-icon-wrapper {
+  position: relative;
+  display: inline-block;
+  cursor: help;
+  z-index: 1;
+}
+
+.status-icon {
+  font-size: 24px;
+  line-height: 1;
+  display: block;
+}
+
+/* Tooltip styling - hidden by default */
+.analysis-tooltip {
+  visibility: hidden;
+  opacity: 0;
+  position: absolute;
+  z-index: 1000;
+  left: 40px;
+  top: 0;
+  width: 400px;
+  max-width: 90vw;
+  background: #1a1d24;
+  color: #e8eaed;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  font-size: 14px;
+  line-height: 1.6;
+  text-align: left;
+  border: 1px solid var(--border-light);
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+  pointer-events: none;
+}
+
+/* Show tooltip on hover */
+.status-icon-wrapper:hover .analysis-tooltip {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* Arrow pointing to the icon */
+.analysis-tooltip::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 20px;
+  width: 0;
+  height: 0;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-right: 8px solid var(--border-light);
+}
+
+.analysis-tooltip::after {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: 21px;
+  width: 0;
+  height: 0;
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
+  border-right: 7px solid #1a1d24;
+}
+
+/* Tooltip content styling */
+.analysis-tooltip strong {
+  color: #ffffff;
+  display: block;
+  margin-bottom: 8px;
+  font-size: 15px;
+}
+
+.analysis-tooltip br {
+  display: block;
+  content: "";
+  margin: 6px 0;
+}
+
+.analysis-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.analysis-message {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 768px) {
+  .analysis-tooltip {
+    width: 300px;
+    left: auto;
+    right: -10px;
+    top: 40px;
+  }
+  
+  .analysis-tooltip::before,
+  .analysis-tooltip::after {
+    left: auto;
+    right: 20px;
+    top: -8px;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-bottom: 8px solid var(--border-light);
+    border-top: none;
+  }
+  
+  .analysis-tooltip::after {
+    top: -6px;
+    border-bottom-color: #1a1d24;
+  }
+}
+
+/* ===== VISUALIZATION PRESETS (TAB STYLE) ===== */
+.preset-selector-container {
+    margin-bottom: 1.5rem;
+}
+
+.preset-tabs {
+    display: flex;
+    gap: 0.5rem;
+    background: var(--panel);
+    padding: 8px;
+    border-radius: 12px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    border: 1px solid var(--border);
+}
+
+.preset-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.preset-tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: inherit;
+    color: var(--muted);
+    font-size: 0.9rem;
+    font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+}
+
+.preset-tab::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--primary);
+    transform: scaleX(0);
+    transition: transform 0.3s ease;
+}
+
+.preset-tab:hover {
+    background: var(--bg);
+    color: var(--text);
+}
+
+.preset-tab.active {
+    background: var(--bg);
+    color: var(--primary);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.preset-tab.active::before {
+    transform: scaleX(1);
+}
+
+.preset-tab-icon {
+    font-size: 1.25rem;
+    line-height: 1;
+}
+
+.preset-tab-name {
+    font-weight: 600;
+}
+
+
+/* ===== MOBILE-ONLY BLOCK ===== */
+@media (max-width: 480px) {
+  /* Base & typography */
+  html { scroll-behavior: smooth; }
+  body {
+    font-size: 14px;
+    line-height: 1.5;
+    padding: 0 12px;
+  }
+
+  /* Header */
+  header { padding: 10px 16px; }
+  header h1 { font-size: 1.5rem; }
+  header p  { font-size: 0.85rem; }
+
+  /* Containers & panels */
+  .tab-container,
+  .panel {
+    padding: 16px;
+    margin: 1rem 0;
+    border-radius: 12px;
+  }
+
+  /* Tabs: touch-friendly, scrollable */
+  .tab-nav {
+    gap: 0.25rem;
+    padding: 0.5rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .tab-nav::-webkit-scrollbar { display: none; }
+
+  .tab-button {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* Buttons & form inputs: larger tap targets */
+  button,
+  input[type="text"],
+  input[type="password"],
+  select {
+    font-size: 14px;
+    padding: 10px 14px;
+  }
+  button { width: 100%; }
+
+  /* Input groups: stack nicely */
+  .input-group {
+    margin: 0.75rem 0;
+  }
+  .input-group label {
+    display: block;
+    min-width: 0;
+    margin: 0 0 6px 0;
+  }
+
+  /* Zone fields */
+  .zone-field input[type="text"] {
+    width: 100%;
+    font-size: 15px;
+  }
+
+  /* Actions & navigation */
+  .actions { gap: 0.75rem; }
+  .nav-buttons {
+    flex-direction: column;
+    gap: 1rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--border);
+  }
+  .nav-buttons button { width: 100%; }
+
+  /* Grids → single column */
+  .stats,
+  .training-analysis,
+  .athlete-info,
+  .activity-stats,
+  .details-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Activity list spacing */
+  .activity-item { padding: 16px; }
+  .activity-header { flex-direction: column; gap: 8px; }
+  .activity-type { margin-top: 6px; }
+
+  /* Tooltips: hide on mobile for clarity */
+  .tooltip { display: none !important; }
+
+  /* Comparison view adjustments */
+  .comparison-header { display: none; }
+  .comparison-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 12px;
+  }
+  .stat-label {
+    font-size: 0.9rem;
+    margin-bottom: 6px;
+  }
+  .stat-value,
+  .stat-change {
+    justify-content: flex-start;
+  }
+  .stat-value::before {
+    content: attr(data-label);
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-right: 8px;
+    font-weight: 400;
+  }
+
+  /* Charts: ensure fit */
+  canvas,
+  #chart {
+    max-height: 280px;
+    height: 280px !important;
+  }
+
+  /* Modals: tighter layout */
+  .modal-content {
+    width: 95%;
+    max-height: 95vh;
+  }
+
+  /* Info box: reduce spacing */
+  .info-box { padding: 16px; }
+  .info-title { font-size: 20px; }
+  .info-text  { font-size: 14px; }
+  .info-footer { flex-direction: column; }
+  .info-button { width: 100%; }
 }

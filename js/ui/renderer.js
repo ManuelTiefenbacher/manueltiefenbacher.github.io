@@ -618,12 +618,21 @@ class UIRenderer {
     let html = '<div class="training-analysis">';
     
     Object.values(analysis).forEach(item => {
+      // Escape HTML for tooltip and convert newlines to <br>
+      const tooltipHTML = item.tooltip
+        .replace(/\n/g, '<br>')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/&lt;strong&gt;/g, '<strong>')
+        .replace(/&lt;\/strong&gt;/g, '</strong>')
+        .replace(/&lt;br&gt;/g, '<br>');
+      
       html += `
         <div class="analysis-card ${item.status}">
           <div class="analysis-header">
-            <span class="status-icon-wrapper">
+            <span class="status-icon-wrapper" title="Click for details">
               <span class="status-icon">${statusIcon[item.status]}</span>
-              <span class="analysis-tooltip">${item.tooltip}</span>
+              <div class="analysis-tooltip">${tooltipHTML}</div>
             </span>
             <h3>${item.metric}</h3>
           </div>
