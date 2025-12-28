@@ -1,5 +1,5 @@
 // js/ui/settings.js
-// Settings management (HR Max and Zone configuration)
+// Settings management (HR Max, Zone configuration, Chart ranges, and Presets)
 
 class SettingsManager {
   constructor() {
@@ -8,6 +8,16 @@ class SettingsManager {
       z3Upper: 0.85,
       z4Upper: 0.90,
       z5Upper: 0.95
+    };
+    this.CHART_DEFAULTS = {
+      distanceChartMonths: 6,
+      intensityChartWeeks: 4
+    };
+    this.PRESETS = {
+      'last-month': { distanceChartMonths: 1, intensityChartWeeks: 4, label: 'Last Month' },
+      'last-quarter': { distanceChartMonths: 3, intensityChartWeeks: 12, label: 'Last Quarter' },
+      'last-half': { distanceChartMonths: 6, intensityChartWeeks: 24, label: 'Last 6 Months' },
+      'last-year': { distanceChartMonths: 12, intensityChartWeeks: 52, label: 'Last Year' }
     };
   }
 
@@ -18,6 +28,8 @@ class SettingsManager {
     this.setupHRMaxControls();
     this.setupZoneControls();
     this.setupScanButton();
+    this.setupChartRangeControls();
+    this.setupPresetButtons();
     this.loadSavedSettings();
   }
 
@@ -43,6 +55,18 @@ class SettingsManager {
     const maxHrInput = document.getElementById('maxHrInput');
     if (maxHrInput && hrMax) {
       maxHrInput.value = hrMax;
+    }
+
+    // Load chart ranges
+    const chartSettings = this.loadChartRanges();
+    const distanceMonthsInput = document.getElementById('distanceChartMonths');
+    const intensityWeeksInput = document.getElementById('intensityChartWeeks');
+    
+    if (distanceMonthsInput) {
+      distanceMonthsInput.value = chartSettings.distanceChartMonths;
+    }
+    if (intensityWeeksInput) {
+      intensityWeeksInput.value = chartSettings.intensityChartWeeks;
     }
   }
 
@@ -183,6 +207,130 @@ class SettingsManager {
   }
 
   /**
+   * Setup chart range controls
+   */
+  setupChartRangeControls() {
+    const saveBtn = document.getElementById('saveChartRangesBtn');
+    const resetBtn = document.getElementById('resetChartRangesBtn');
+    const distanceMonthsInput = document.getElementById('distanceChartMonths');
+    const intensityWeeksInput = document.getElementById('intensityChartWeeks');
+
+    if (saveBtn) {
+      saveBtn.addEventListener('click', () => {
+        this.applyChartRanges();
+      });
+    }
+
+    if (resetBtn) {
+      resetBtn.addEventListener('click', () => {
+        // Reset to defaults
+        if (distanceMonthsInput) {
+          distanceMonthsInput.value = this.CHART_DEFAULTS.distanceChartMonths;
+        }
+        if (intensityWeeksInput) {
+          intensityWeeksInput.value = this.CHART_DEFAULTS.intensityChartWeeks;
+        }
+
+        this.saveChartRanges(this.CHART_DEFAULTS);
+
+        // Re-render charts
+        const runs = window.dataProcessor.runs;
+        if (runs.length > 0) {
+          window.uiRenderer.renderCharts(runs);
+        }
+
+        window.feedbackManager.showFeedback('✅ Chart ranges reset to defaults', 'success');
+      });
+    }
+  }
+
+  /**
+   * Setup preset buttons
+   */
+  setupPresetButtons() {
+    const presetContainer = document.getElementById('chartPresets');
+    if (!presetContainer) return;
+
+    Object.entries(this.PRESETS).forEach(([key, preset]) => {
+      const btn = document.createElement('button');
+      btn.className = 'preset-btn';
+      btn.textContent = preset.label;
+      btn.addEventListener('click', () => this.applyPreset(key));
+      presetContainer.appendChild(btn);
+    });
+  }
+
+  /**
+   * Apply a preset
+   */
+  applyPreset(presetKey) {
+    const preset = this.PRESETS[presetKey];
+    if (!preset) return;
+
+    const distanceMonthsInput = document.getElementById('distanceChartMonths');
+    const intensityWeeksInput = document.getElementById('intensityChartWeeks');
+
+    if (distanceMonthsInput) {
+      distanceMonthsInput.value = preset.distanceChartMonths;
+    }
+    if (intensityWeeksInput) {
+      intensityWeeksInput.value = preset.intensityChartWeeks;
+    }
+
+    this.saveChartRanges({
+      distanceChartMonths: preset.distanceChartMonths,
+      intensityChartWeeks: preset.intensityChartWeeks
+    });
+
+    // Re-render charts
+    const runs = window.dataProcessor.runs;
+    if (runs.length > 0) {
+      window.uiRenderer.renderCharts(runs);
+    }
+
+    window.feedbackManager.showFeedback(`✅ Applied preset: ${preset.label}`, 'success');
+  }
+
+  /**
+   * Apply chart ranges from inputs
+   */
+  applyChartRanges() {
+    const distanceMonthsInput = document.getElementById('distanceChartMonths');
+    const intensityWeeksInput = document.getElementById('intensityChartWeeks');
+
+    const distanceMonths = parseInt(distanceMonthsInput.value);
+    const intensityWeeks = parseInt(intensityWeeksInput.value);
+
+    // Validate ranges
+    if (!distanceMonths || distanceMonths < 1 || distanceMonths > 24) {
+      window.feedbackManager.showError('Distance chart months must be between 1 and 24');
+      return;
+    }
+
+    if (!intensityWeeks || intensityWeeks < 1 || intensityWeeks > 52) {
+      window.feedbackManager.showError('Intensity chart weeks must be between 1 and 52');
+      return;
+    }
+
+    // Save settings
+    this.saveChartRanges({
+      distanceChartMonths: distanceMonths,
+      intensityChartWeeks: intensityWeeks
+    });
+
+    // Re-render charts
+    const runs = window.dataProcessor.runs;
+    if (runs.length > 0) {
+      window.uiRenderer.renderCharts(runs);
+    }
+
+    window.feedbackManager.showFeedback(
+      `✅ Chart ranges updated: ${distanceMonths} months, ${intensityWeeks} weeks`,
+      'success'
+    );
+  }
+
+  /**
    * Read zones from UI inputs
    */
   readZonesFromUI(inputs) {
@@ -251,6 +399,41 @@ class SettingsManager {
         }
       });
     }
+  }
+
+  /**
+   * Save chart ranges to localStorage
+   */
+  saveChartRanges(ranges) {
+    try {
+      localStorage.setItem('chart_ranges', JSON.stringify(ranges));
+      return true;
+    } catch (err) {
+      console.error('Failed to save chart ranges:', err);
+      return false;
+    }
+  }
+
+  /**
+   * Load chart ranges from localStorage
+   */
+  loadChartRanges() {
+    try {
+      const saved = localStorage.getItem('chart_ranges');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (err) {
+      console.error('Failed to load chart ranges:', err);
+    }
+    return this.CHART_DEFAULTS;
+  }
+
+  /**
+   * Get chart ranges (used by renderer)
+   */
+  getChartRanges() {
+    return this.loadChartRanges();
   }
 }
 

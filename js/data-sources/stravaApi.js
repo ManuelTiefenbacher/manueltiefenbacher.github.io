@@ -159,7 +159,7 @@ class StravaAPI {
       // Fetch all activities with pagination
       const allActivities = [];
       const perPage = 200;
-      const maxPages = 3;
+      const maxPages = 2;
       
       for (let page = 1; page <= maxPages; page++) {
         window.feedbackManager.showFeedback(
@@ -203,6 +203,7 @@ class StravaAPI {
         avgHR: r.average_heartrate || null,
         maxHR: r.max_heartrate || null,
         hrStream: r.hrStream || null,
+        paceStream: r.paceStream || null,
         source: 'Strava API'
       }));
 
@@ -221,8 +222,9 @@ class StravaAPI {
       }
       
       const hrCount = normalizedRuns.filter(r => r.hrStream).length;
+      const paceCount = normalizedRuns.filter(r => r.paceStream).length;
       window.feedbackManager.showFeedback(
-        `✅ Successfully fetched ${normalizedRuns.length} runs from Strava! (${hrCount} with detailed HR data)`,
+        `✅ Successfully fetched ${normalizedRuns.length} runs from Strava! (${hrCount} with HR data, ${paceCount} with pace data)`,
         'success'
       );
       
@@ -233,11 +235,15 @@ class StravaAPI {
   }
 
   /**
-   * Fetch detailed data for each activity including HR streams
+   * Fetch detailed data for each activity including HR and pace streams
    */
   async fetchDetailedData(activities) {
     return await Promise.all(
       activities.map(async (activity) => {
+        // Initialize streams as null
+        let hrStream = null;
+        let paceStream = null;
+        
         try {
           // Fetch detailed activity
           const detailResponse = await fetch(
@@ -247,36 +253,49 @@ class StravaAPI {
           
           if (!detailResponse.ok) {
             console.warn(`Failed to fetch details for activity ${activity.id}`);
-            return { ...activity, hrStream: null };
+            return { ...activity, hrStream: null, paceStream: null };
           }
           
           const detailData = await detailResponse.json();
           
-          // Fetch HR stream
-          let hrStream = null;
+          // Fetch HR and PACE streams
           try {
             const streamResponse = await fetch(
-              `https://www.strava.com/api/v3/activities/${activity.id}/streams?keys=heartrate,time&key_by_type=true`,
+              `https://www.strava.com/api/v3/activities/${activity.id}/streams?keys=heartrate,time,velocity&key_by_type=true`,
               { headers: { 'Authorization': `Bearer ${this.accessToken}` } }
             );
             
             if (streamResponse.ok) {
               const streamData = await streamResponse.json();
+              
+              // HR Stream
               if (streamData.heartrate && streamData.time) {
                 hrStream = {
                   heartrate: streamData.heartrate.data,
                   time: streamData.time.data
                 };
               }
+              
+              // Pace Stream (convert velocity m/s to min/km)
+              if (streamData.velocity && streamData.time) {
+                paceStream = {
+                  pace: streamData.velocity.data.map(v => {
+                    // Convert m/s to min/km
+                    // v = m/s, pace = min/km = 1000/(v*60) = 16.667/v
+                    return v > 0 ? 16.667 / v : 0;
+                  }),
+                  time: streamData.time.data
+                };
+              }
             }
           } catch (err) {
-            console.warn(`Failed to fetch HR stream for activity ${activity.id}`);
+            console.warn(`Failed to fetch streams for activity ${activity.id}:`, err);
           }
           
-          return { ...detailData, hrStream };
+          return { ...detailData, hrStream, paceStream };
         } catch (err) {
           console.error(`Error fetching activity ${activity.id}:`, err);
-          return { ...activity, hrStream: null };
+          return { ...activity, hrStream: null, paceStream: null };
         }
       })
     );

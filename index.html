@@ -18,25 +18,25 @@
 
 <body>
   <header>
-    <h1>Tri-Runalyzer</h1>
-    <p>Consistency Analysis</p>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0rem; margin-top: 0rem;">
+        <img src="logo2.png"; width="100">
+        <!-- Session Info Banners -->
+        <div id="sessionInfo" style="display: none; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); height: 60px; color: white; padding: 12px 20px; border-radius: 8px; margin-top: 20px; align-items: center; justify-content: space-between;">
+            <span style="font-weight: 600;">📦 Data from previous session loaded from cache</span>
+            <button onclick="clearAndReload()" style="background: rgba(255,255,255,0.2); color: white; padding: 8px 20px; margin-top: 1px; border: 2px solid white; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s;">Clear Data</button>
+        </div>
     
-    <!-- Session Info Banners -->
-    <div id="sessionInfo" style="display: none; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 20px; border-radius: 8px; margin-top: 15px; align-items: center; justify-content: space-between;">
-      <span style="font-weight: 600;">📦 Data from previous session loaded from cache</span>
-      <button onclick="clearAndReload()" style="background: rgba(255,255,255,0.2); color: white; padding: 8px 16px; border: 2px solid white; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s;">Clear Data</button>
-    </div>
-    
-    <div id="stravaSessionInfo" style="display: none; background: linear-gradient(135deg, #FC4C02 0%, #E73D02 100%); color: white; padding: 12px 20px; border-radius: 8px; margin-top: 15px; align-items: center; justify-content: space-between;">
-      <span style="font-weight: 600;">🏃 <span id="stravaActivityCount">0</span> Strava activities from previous session loaded from cache</span>
-      <button onclick="clearStravaData()" style="background: rgba(255,255,255,0.2); color: white; padding: 8px 16px; border: 2px solid white; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s;">Clear Strava Data</button>
-    </div>
+        <div id="stravaSessionInfo" style="display: none; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 20px; border-radius: 8px; margin-bottom: 12px; align-items: center; justify-content: space-between;">
+            <span style="font-weight: 600;">🏃 <span id="stravaActivityCount">0</span> Strava activities from previous session loaded from cache</span>
+            <button onclick="clearStravaData()" style="background: rgba(255,255,255,0.2); color: white; padding: 8px 16px; border: 2px solid white; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s;">Clear Strava Data</button>
+        </div>
 
-    <div class="progress-container" id="progressContainer">
-      <div class="progress-text" id="progressText">Processing files...</div>
-      <div class="progress-bar">
-        <div class="progress-fill" id="progressFill"></div>
-      </div>
+        <div class="progress-container" id="progressContainer" style="display: none; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 20px; border-radius: 8px; margin-bottom: 12px; align-items: center; justify-content: space-between;">
+            <div class="progress-text" id="progressText">Processing files...</div>
+            <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+            </div>
+        </div>
     </div>
   </header>
 
@@ -46,6 +46,7 @@
       <button class="tab-button active" onclick="switchTab('upload')">Upload Data</button>
       <button class="tab-button" onclick="switchTab('settings')">Settings</button>
       <button class="tab-button" onclick="switchTab('analysis')">Analysis</button>
+      <button class="tab-button" onclick="switchTab('comparison')">Compare Periods</button>
     </div>
 
     <!-- ===== TAB 1: UPLOAD DATA ===== -->
@@ -54,14 +55,16 @@
       <!-- Info Box -->
       <div class="info-box">
         <div class="info-box-content">
-          <div class="info-icon">
-            <svg viewBox="0 0 24 24">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="12" y1="16" x2="12" y2="12"></line>
-              <line x1="12" y1="8" x2="12.01" y2="8"></line>
-            </svg>
+          <div style="display: grid; grid-template-columns: auto auto; justify-self: start; align-self: start; gap: 1rem">
+            <div class="info-icon">
+              <svg viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+              </svg>
+            </div>
+            <h2 class="info-title">Important Information: Data storage</h2>
           </div>
-          <h2 class="info-title">Important Information: Data storage</h2>
           <p class="info-text">
             Any of your data uploaded to this page is not stored on any server. 
             However, it will be saved in your browser cache, so you do not need to upload your data again after reloading the page.
@@ -73,16 +76,19 @@
       <!-- Strava API Connection -->
       <div class="panel">
         <h2>Strava API Connection</h2>
-        <p style="color:var(--muted);font-size:0.9rem;margin-top:8px">
-          Connect directly to Strava API to fetch your latest activities in real-time. 
-          You'll need to create a Strava API application to get your Client ID and Client Secret. 
-        </p>
-        <p style="color:var(--allout);font-size:0.9rem;">
-          <span>⚠</span> Your data will not be stored on any server; it is processed locally in your browser.
-        </p>
         
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 0.5rem;">
           <div class="instructions-container">
+            <p style="color:var(--muted);font-size:0.9rem;">
+                Connect directly to Strava API to fetch your latest activities in real-time. 
+                You'll need to create a Strava API application to get your Client ID and Client Secret. 
+            </p>
+            <p style="color:var(--muted);font-size:0.9rem;margin-top:8px">
+                There is a limit of Strava activities that may be fetched over the API. In case you get ERROR 429, consider the ZIP Upload below.
+            </p>
+            <p style="color:var(--allout);font-size:0.9rem;margin-top:8px">
+                <span>⚠ </span> Your data will not be stored on any server; it is processed locally in your browser.
+            </p>
             <button class="instructions-toggle" onclick="this.parentElement.classList.toggle('expanded')">
               Connect to Strava API
               <span class="toggle-icon">▼</span>
@@ -119,7 +125,7 @@
                 <p><strong>✅ Connected to Strava!</strong></p>
                 <p>Click the button below to fetch your activity data.</p>
               </div>
-              <button onclick="fetchStravaData()" style="background: #34a853;">📥 Request Data from Strava</button>
+              <button onclick="fetchStravaData()" style="background: #34a853; margin-top: 0px;">📥 Request Data from Strava</button>
             </div>
           </div>
         </div>
@@ -128,16 +134,18 @@
       <!-- Strava ZIP Upload -->
       <div class="panel">
         <h2>Optional: Strava ZIP Upload</h2>
-        <p style="color:var(--muted);font-size:0.9rem;margin-top:8px">
-          Upload your Strava export ZIP file. The activities.csv and all TCX files will be automatically extracted and analyzed. 
-          This is optional and not needed if you connected to Strava above.
-        </p>
-        <p style="color:var(--allout);font-size:0.9rem;">
-          <span>⚠</span> Your data will not be stored on any server; it is processed locally in your browser.
-        </p>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 1.5rem;">
           <div class="instructions-container">
+            <p style="color:var(--muted);font-size:0.9rem;">
+                Upload your Strava export ZIP file. The activities.csv and all TCX files will be automatically extracted and analyzed. 
+            </p>
+            <p style="color:var(--muted);font-size:0.9rem;margin-top:8px">
+                This is optional and not needed if you connected to Strava above or you want to analyze more than the Strava API activity fetch limit.
+            </p>
+            <p style="color:var(--allout);font-size:0.9rem;margin-top:8px">
+                <span>⚠ </span> Your data will not be stored on any server; it is processed locally in your browser.
+            </p>
             <button class="instructions-toggle" onclick="this.parentElement.classList.toggle('expanded')">
               How to get your Strava data
               <span class="toggle-icon">▼</span>
@@ -231,6 +239,51 @@
         </div>
       </div>
 
+      <hr>
+
+      <!-- Chart Display Settings -->
+      <div class="panel">
+        <h2>Chart Display Settings</h2>
+        <p style="color:var(--muted);font-size:0.9rem;margin-bottom:1rem">
+          Customize the time ranges for your analysis charts.
+        </p>
+
+        <!-- Quick Presets -->
+        <div style="margin-bottom: 1.5rem;">
+          <h3 style="font-size: 1rem; margin-bottom: 0.75rem;">Quick Presets</h3>
+          <div id="chartPresets" style="display: flex; gap: 0.5rem; flex-wrap: wrap;"></div>
+        </div>
+
+        <!-- Manual Settings -->
+        <div class="stats">
+          <div class="zone-field">
+            <label>Distance Chart Time Range (months):
+              <input id="distanceChartMonths" type="number" min="1" max="24" value="6" 
+                     inputmode="numeric" autocomplete="off" placeholder="e.g., 6" />
+            </label>
+            <p style="color:var(--muted);font-size:0.85rem;margin-top:0.5rem">
+              Shows weekly distance breakdown for the last N months (1-24)
+            </p>
+          </div>
+
+          <div class="zone-field">
+            <label>Intensity Chart Time Range (weeks):
+              <input id="intensityChartWeeks" type="number" min="1" max="52" value="4" 
+                     inputmode="numeric" autocomplete="off" placeholder="e.g., 4" />
+            </label>
+            <p style="color:var(--muted);font-size:0.85rem;margin-top:0.5rem">
+              Shows heart rate zone distribution for the last N weeks (1-52)
+            </p>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="saveChartRangesBtn">Save Chart Settings</button>
+          <button id="resetChartRangesBtn" type="button" class="secondary">Reset to Defaults</button>
+          <span id="chartRangesStatus" class="status"></span>
+        </div>
+      </div>
+
       <div class="nav-buttons">
         <button onclick="switchTab('upload')" class="secondary">← Back to Upload</button>
         <button onclick="switchTab('analysis')">Next: Analysis →</button>
@@ -242,7 +295,10 @@
 
       <!-- Training Load Analysis -->
       <div class="panel">
-        <h2>Overview</h2>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <h2 style="margin: 0;">Overview</h2>
+          <button id="comparePeriodsBtn" style="margin: 0;">📊 Compare Periods</button>
+        </div>
         <div class="stats">
           <div class="stat">
             <div class="label">Runs - Last 7 Days</div>
@@ -287,7 +343,94 @@
         <div></div>
       </div>
     </div>
+
+    <!-- ===== TAB 4: COMPARISON ===== -->
+    <div id="tab-comparison" class="tab-content">
+      <div class="panel">
+        <h2 id="comparisonTitle">Period Comparison</h2>
+        <p style="color:var(--muted);font-size:0.9rem;margin-bottom:1.5rem">
+          Select two periods to compare using the button above. This will show side-by-side statistics and charts.
+        </p>
+        
+        <!-- Comparison Stats -->
+        <div id="comparisonStats"></div>
+        
+        <!-- Comparison Charts -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
+          <div>
+            <canvas id="zoneComparisonChart" height="300"></canvas>
+          </div>
+          <div>
+            <canvas id="runTypeComparisonChart" height="300"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="nav-buttons">
+        <button onclick="switchTab('analysis')" class="secondary">← Back to Analysis</button>
+        <button onclick="window.periodComparison.openComparisonModal()">Compare Different Periods</button>
+      </div>
+    </div>
   </div>
+
+  <!-- ===== COMPARISON MODAL ===== -->
+  <div id="comparisonModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Compare Time Periods</h2>
+          <button id="closeComparisonModal" class="close-btn">&times;</button>
+        </div>
+    
+        <div class="modal-body">
+          <p style="color:var(--muted);margin-bottom:1.5rem">
+            Select a time period length, then choose two periods of equal length to compare. This ensures meaningful comparisons between similar timeframes.
+          </p>
+      
+          <!-- Period Length Selection -->
+          <div class="select-group" style="margin-bottom: 1.5rem;">
+            <label for="periodLengthSelect">Period Length:</label>
+            <select id="periodLengthSelect" style="width: 100%;">
+              <option value="7">7 Days (Weekly)</option>
+              <option value="14">14 Days (Bi-weekly)</option>
+              <option value="30" selected>30 Days (Monthly)</option>
+              <option value="90">90 Days (Quarterly)</option>
+              <option value="180">180 Days (Half-yearly)</option>
+              <option value="365">365 Days (Yearly)</option>
+            </select>
+            <p style="color:var(--muted);font-size:0.85rem;margin-top:0.5rem">
+              Both periods will be this length for a fair comparison
+            </p>
+          </div>
+      
+          <div class="comparison-select-grid">
+            <div class="select-group">
+              <label for="period1Select">First Period:</label>
+              <select id="period1Select">
+                <option value="">-- Select Period --</option>
+              </select>
+            </div>
+        
+            <div class="select-group">
+              <label for="period2Select">Compare To:</label>
+              <select id="period2Select">
+                <option value="">-- Select Period --</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="margin-top: 1rem; padding: 12px; background: rgba(66, 133, 244, 0.1); border-radius: 8px; border-left: 4px solid #4285f4;">
+            <p style="color:var(--text);font-size:0.9rem;margin:0;">
+              <strong>💡 Tip:</strong> Compare "This Month" vs "Last Month" to see recent changes, or "This Quarter" vs same quarter last year for year-over-year progress.
+            </p>
+          </div>
+        </div>
+    
+        <div class="modal-footer">
+          <button onclick="window.periodComparison.closeComparisonModal()" class="secondary">Cancel</button>
+          <button id="generateComparisonBtn">Generate Comparison</button>
+        </div>
+      </div>
+    </div>
 
   <!-- Application Scripts - LOAD IN CORRECT ORDER -->
   
@@ -305,6 +448,7 @@
   <!-- 4. Analysis layer (depends on dataProcessor) -->
   <script src="js/analysis/hrAnalysis.js"></script>
   <script src="js/analysis/runClassification.js"></script>
+  <script src="js/analysis/intervalDetection.js"></script>
   <script src="js/analysis/trainingLoad.js"></script>
   
   <!-- 5. Data sources (depend on dataProcessor and analysis) -->
@@ -314,6 +458,7 @@
   <!-- 6. UI layer (depends on everything) -->
   <script src="js/ui/renderer.js"></script>
   <script src="js/ui/settings.js"></script>
+  <script src="js/ui/comparison.js"></script>
   
   <!-- 7. App initialization (loads last, depends on everything) -->
   <script src="js/core/app.js"></script>

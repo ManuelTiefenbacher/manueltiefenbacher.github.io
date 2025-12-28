@@ -78,16 +78,20 @@ class UIRenderer {
    * Render average distance chart with zone stacking
    */
   renderAverageDistanceChart(runs, avgWeekly) {
-    // Calculate weekly zone data
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-    
-    const recentRuns = runs.filter(r => r.date >= sixMonthsAgo);
+    // Get chart range settings
+    const chartSettings = window.settingsManager.getChartRanges();
+    const monthsToShow = chartSettings.distanceChartMonths;
+
+    // Calculate date range based on settings
+    const rangeStart = new Date();
+    rangeStart.setMonth(rangeStart.getMonth() - monthsToShow);
+
+    const recentRuns = runs.filter(r => r.date >= rangeStart);
     const weeklyData = this.calculateWeeklyZoneData(recentRuns);
-    
+
     // Generate labels
     const labels = weeklyData.map(w => window.helpers.formatDate(w.weekStart));
-    
+
     // Destroy existing chart
     if (this.chart) {
       this.chart.destroy();
@@ -96,59 +100,87 @@ class UIRenderer {
     const canvas = document.getElementById('chart');
     if (!canvas) return;
 
+    // Update chart title
+    const chartTitle = document.querySelector('#tab-analysis .panel h2');
+    if (chartTitle && chartTitle.textContent.includes('Average Weekly Distance')) {
+      chartTitle.textContent = `Average Weekly Distance (Last ${monthsToShow} Month${monthsToShow !== 1 ? 's' : ''})`;
+    }
+
     // Prepare datasets
     const datasets = [
       {
         label: 'No HR Data',
         data: weeklyData.map(w => w.noHR),
         backgroundColor: 'rgba(154, 160, 166, 0.5)',
-        stack: 'distance'
+        stack: 'distance',
+        yAxisID: 'y'
       },
       {
         label: 'Z1',
         data: weeklyData.map(w => w.z1),
         backgroundColor: 'rgba(189, 189, 189, 0.7)',
-        stack: 'distance'
+        stack: 'distance',
+        yAxisID: 'y'
       },
       {
         label: 'Z2',
         data: weeklyData.map(w => w.z2),
         backgroundColor: 'rgba(66, 133, 244, 0.7)',
-        stack: 'distance'
+        stack: 'distance',
+        yAxisID: 'y'
       },
       {
         label: 'Z3',
         data: weeklyData.map(w => w.z3),
         backgroundColor: 'rgba(52, 168, 83, 0.7)',
-        stack: 'distance'
+        stack: 'distance',
+        yAxisID: 'y'
       },
       {
         label: 'Z4',
         data: weeklyData.map(w => w.z4),
         backgroundColor: 'rgba(255, 153, 0, 0.7)',
-        stack: 'distance'
+        stack: 'distance',
+        yAxisID: 'y'
       },
       {
         label: 'Z5',
         data: weeklyData.map(w => w.z5),
         backgroundColor: 'rgba(234, 67, 53, 0.7)',
-        stack: 'distance'
+        stack: 'distance',
+        yAxisID: 'y'
       },
       {
         label: 'Z6',
         data: weeklyData.map(w => w.z6),
         backgroundColor: 'rgba(156, 39, 176, 0.7)',
-        stack: 'distance'
+        stack: 'distance',
+        yAxisID: 'y'
       },
       {
         type: 'line',
-        label: 'Ø 6 Months',
+        label: `Ø ${monthsToShow} Month${monthsToShow !== 1 ? 's' : ''}`,
         data: Array(labels.length).fill(avgWeekly),
         borderColor: 'rgba(138, 180, 248, 1)',
         borderWidth: 2,
         borderDash: [5, 5],
         pointRadius: 0,
-        fill: false
+        fill: false,
+        yAxisID: 'y'
+      },
+      // ADD PACE LINE
+      {
+        type: 'line',
+        label: 'Avg Pace (min/km)',
+        data: weeklyData.map(w => w.avgPace),
+        borderColor: 'rgba(251, 188, 4, 1)',
+        backgroundColor: 'rgba(251, 188, 4, 0.1)',
+        borderWidth: 3,
+        pointRadius: 4,
+        pointBackgroundColor: 'rgba(251, 188, 4, 1)',
+        fill: false,
+        yAxisID: 'y2',
+        tension: 0.3
       }
     ];
 
@@ -176,7 +208,16 @@ class UIRenderer {
               label: (context) => {
                 const label = context.dataset.label || '';
                 const value = context.parsed.y;
-                if (value === 0) return null;
+            
+                if (value === 0 || value === null) return null;
+            
+                // Format pace specially
+                if (label === 'Avg Pace (min/km)') {
+                  const minutes = Math.floor(value);
+                  const seconds = Math.round((value - minutes) * 60);
+                  return `${label}: ${minutes}:${seconds.toString().padStart(2, '0')}/km`;
+                }
+            
                 return `${label}: ${value.toFixed(1)} km`;
               },
               footer: (tooltipItems) => {
@@ -186,7 +227,7 @@ class UIRenderer {
                     total += item.parsed.y;
                   }
                 });
-                return `Total: ${total.toFixed(1)} km`;
+                return total > 0 ? `Total: ${total.toFixed(1)} km` : '';
               }
             }
           }
@@ -195,11 +236,27 @@ class UIRenderer {
           y: {
             stacked: true,
             beginAtZero: true,
+            position: 'left',
             ticks: {
               color: '#9aa0a6',
               callback: (value) => value + ' km'
             },
             grid: { color: '#2a2f3a' }
+          },
+          y2: {
+            position: 'right',
+            beginAtZero: false,
+            ticks: {
+              color: '#fbbc04',
+              callback: (value) => {
+                const minutes = Math.floor(value);
+                const seconds = Math.round((value - minutes) * 60);
+                return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+              }
+            },
+            grid: {
+              display: false
+            }
           },
           x: {
             stacked: true,
@@ -216,25 +273,34 @@ class UIRenderer {
    */
   calculateWeeklyZoneData(runs) {
     const weekMap = new Map();
-    
+
     runs.forEach(run => {
       const weekStart = window.helpers.getWeekStart(run.date);
       const weekKey = weekStart.toISOString().split('T')[0];
-      
+  
       if (!weekMap.has(weekKey)) {
         weekMap.set(weekKey, {
           weekStart,
           total: 0,
           z1: 0, z2: 0, z3: 0, z4: 0, z5: 0, z6: 0,
-          noHR: 0
+          noHR: 0,
+          paces: [], // Track all paces for averaging
+          totalDuration: 0
         });
       }
-      
+  
       const weekData = weekMap.get(weekKey);
       weekData.total += run.distance;
-      
+      weekData.totalDuration += run.duration;
+  
+      // Track pace
+      const avgPace = window.intervalDetector.calculateAveragePace(run);
+      if (avgPace) {
+        weekData.paces.push(avgPace);
+      }
+  
       const hrDataType = window.hrAnalyzer.getHRDataType(run);
-      
+  
       if (hrDataType === 'none') {
         weekData.noHR += run.distance;
       } else if (hrDataType === 'detailed') {
@@ -253,8 +319,16 @@ class UIRenderer {
         weekData[zoneKey] += run.distance;
       }
     });
-    
-    return Array.from(weekMap.values()).sort((a, b) => a.weekStart - b.weekStart);
+
+    // Calculate average pace per week
+    const result = Array.from(weekMap.values()).map(week => ({
+      ...week,
+      avgPace: week.paces.length > 0 
+        ? week.paces.reduce((sum, p) => sum + p, 0) / week.paces.length 
+        : null
+    }));
+
+    return result.sort((a, b) => a.weekStart - b.weekStart);
   }
 
   /**
@@ -268,15 +342,26 @@ class UIRenderer {
     const existing = Chart.getChart(canvas);
     if (existing) existing.destroy();
 
-    const last28 = window.dataProcessor.getRunsInRange(28);
-    const distribution = window.hrAnalyzer.calculateZoneDistribution(last28);
+    // Get chart range settings
+    const chartSettings = window.settingsManager.getChartRanges();
+    const weeksToShow = chartSettings.intensityChartWeeks;
+    const daysToShow = weeksToShow * 7;
+
+    const runsInRange = window.dataProcessor.getRunsInRange(daysToShow);
+    const distribution = window.hrAnalyzer.calculateZoneDistribution(runsInRange);
+
+    // Update chart title
+    const chartTitle = document.querySelector('#intensityChart').closest('.panel').querySelector('h2');
+    if (chartTitle) {
+      chartTitle.textContent = `Intensity (Last ${weeksToShow} Week${weeksToShow !== 1 ? 's' : ''})`;
+    }
 
     if (distribution.totalDataPoints === 0) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.font = '16px system-ui';
       ctx.fillStyle = '#9aa0a6';
       ctx.textAlign = 'center';
-      ctx.fillText('No detailed HR data available for the last 28 days', canvas.width / 2, canvas.height / 2);
+      ctx.fillText(`No detailed HR data available for the last ${weeksToShow} week${weeksToShow !== 1 ? 's' : ''}`, canvas.width / 2, canvas.height / 2);
       return;
     }
 
@@ -379,15 +464,24 @@ class UIRenderer {
   createRunElement(run, classification) {
     const { category, isLong, hrDataType, detailedHR } = classification;
     const cssClass = window.runClassifier.getCategoryClass(category);
-    
+
     const el = document.createElement('div');
     el.className = `run ${cssClass}`;
-    
+
+    // Detect intervals
+    const intervalInfo = window.intervalDetector.detectInterval(run);
+
     // Create tooltip
-    const tooltip = this.createRunTooltip(run, classification);
-    
+    const tooltip = this.createRunTooltip(run, classification, intervalInfo);
+
     // Create badges
     let badges = '';
+
+    // Interval badge (PRIORITY - show first if detected)
+    if (intervalInfo.isInterval) {
+      badges += '<span class="badge interval-badge">⚡ Interval</span>';
+    }
+
     if (hrDataType === 'none') {
       badges += '<span class="badge no-hr">No HR</span>';
     } else if (hrDataType === 'basic') {
@@ -396,25 +490,25 @@ class UIRenderer {
     if (isLong) {
       badges += '<span class="badge long-run">Long Run</span>';
     }
-    
+
     el.innerHTML = `
       <span>${window.helpers.formatDateFull(run.date)} — ${category}${isLong ? ' (Long)' : ''}</span>
       <span>${badges}<span class="badge">${run.distance.toFixed(1)} km</span></span>
       ${tooltip}
     `;
-    
+
     return el;
   }
 
   /**
    * Create tooltip for run
    */
-  createRunTooltip(run, classification) {
+  createRunTooltip(run, classification, intervalInfo) {
     const { category, hrDataType, detailedHR } = classification;
     const zones = window.dataProcessor.getZonesBPM();
-    
+
     let html = '<div class="tooltip">';
-    
+
     // Basic info
     html += `
       <div class="tooltip-row">
@@ -426,7 +520,28 @@ class UIRenderer {
         <span class="tooltip-value">${run.distance.toFixed(2)} km</span>
       </div>
     `;
-    
+
+    // Interval information
+    if (intervalInfo && intervalInfo.isInterval) {
+      html += `
+        <div class="tooltip-row" style="background: rgba(251, 188, 4, 0.1); padding: 4px; border-radius: 4px; margin: 8px 0;">
+          <span class="tooltip-label">⚡ Intervals:</span>
+          <span class="tooltip-value">${intervalInfo.details}</span>
+        </div>
+      `;
+    }
+
+    // Average pace
+    const avgPace = window.intervalDetector.calculateAveragePace(run);
+    if (avgPace) {
+      html += `
+        <div class="tooltip-row">
+          <span class="tooltip-label">Avg Pace:</span>
+          <span class="tooltip-value">${window.intervalDetector.formatPace(avgPace)}</span>
+        </div>
+      `;
+    }
+
     // HR data info
     if (hrDataType === 'none') {
       html += `
@@ -451,7 +566,7 @@ class UIRenderer {
       // Add HR graph
       html += '<hr style="border:none;border-top:1px solid var(--border);margin:8px 0">';
       html += window.hrAnalyzer.generateHRGraph(detailedHR.hrRecords);
-      
+  
       // Zone distribution
       html += `
         <div class="tooltip-row">
@@ -480,7 +595,7 @@ class UIRenderer {
         </div>
       `;
     }
-    
+
     html += '</div>';
     return html;
   }

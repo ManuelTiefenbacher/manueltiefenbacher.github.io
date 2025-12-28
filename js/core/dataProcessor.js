@@ -29,6 +29,9 @@ class DataProcessor {
       // Unified HR stream format: { heartrate: [...], time: [...] }
       hrStream: this.normalizeHRStream(run.hrStream),
       
+      // Unified pace stream format: { pace: [...], time: [...] }
+      paceStream: this.normalizePaceStream(run.paceStream),
+      
       // Metadata
       source: run.source || 'unknown',
       filename: run.filename || null
@@ -54,6 +57,23 @@ class DataProcessor {
       return {
         heartrate: hrStream.records.map(r => r.heart_rate),
         time: hrStream.records.map((r, i) => i) // Use index if no time
+      };
+    }
+    
+    return null;
+  }
+
+  /**
+   * Normalize pace stream to consistent format
+   */
+  normalizePaceStream(paceStream) {
+    if (!paceStream) return null;
+    
+    // Already in correct format
+    if (paceStream.pace && paceStream.time) {
+      return {
+        pace: paceStream.pace.filter(p => p > 0 && p < 20), // min/km, filter unrealistic values
+        time: paceStream.time
       };
     }
     
@@ -103,6 +123,13 @@ class DataProcessor {
     if (aHasStream && bHasStream) {
       return runA.hrStream.heartrate.length > runB.hrStream.heartrate.length;
     }
+    
+    // Prefer runs with pace data
+    const aHasPace = runA.paceStream?.pace?.length > 0;
+    const bHasPace = runB.paceStream?.pace?.length > 0;
+    
+    if (aHasPace && !bHasPace) return true;
+    if (!aHasPace && bHasPace) return false;
     
     // Prefer runs with basic HR data
     const aHasBasicHR = runA.avgHR > 0 && runA.maxHR > 0;
@@ -154,7 +181,7 @@ class DataProcessor {
 
     if (maxHR > 0) {
       this.hrMax = maxHR;
-      console.log(`❤️  Max HR: ${maxHR} bpm from ${maxActivity.date.toLocaleDateString()}`);
+      console.log(`❤️ Max HR: ${maxHR} bpm from ${maxActivity.date.toLocaleDateString()}`);
     }
 
     return { maxHR, activity: maxActivity };
@@ -194,7 +221,7 @@ class DataProcessor {
    */
   clear() {
     this.runs = [];
-    console.log('🗑️  All data cleared');
+    console.log('🗑️ All data cleared');
   }
 
   /**
@@ -224,6 +251,9 @@ class DataProcessor {
         maxHR: this.hrMax,
         runsWithBasicHR: this.runs.filter(r => r.avgHR > 0).length,
         runsWithStreamHR: this.runs.filter(r => r.hrStream?.heartrate?.length > 0).length
+      },
+      paceData: {
+        runsWithPace: this.runs.filter(r => r.paceStream?.pace?.length > 0).length
       }
     };
   }
