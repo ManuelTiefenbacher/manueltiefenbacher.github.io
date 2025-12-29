@@ -1,0 +1,400 @@
+/* ===== MODERN SIDEBAR NAVIGATION ===== */
+
+/* Sidebar Container */
+.sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    height: 100vh;
+    width: 260px;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    z-index: 100;
+    transition: transform 0.3s ease;
+}
+
+.sidebar.collapsed {
+    transform: translateX(-260px);
+}
+
+/* Sidebar Header */
+.sidebar-header {
+    padding: 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.sidebar-logo {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+}
+
+.sidebar-brand {
+    flex: 1;
+}
+
+.sidebar-brand h1 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--text);
+}
+
+.sidebar-brand p {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin: 0;
+}
+
+/* Sidebar Toggle (Desktop) */
+.sidebar-toggle {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 6px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+}
+
+.sidebar-toggle:hover {
+    background: var(--bg);
+    color: var(--text);
+    transform: none;
+}
+
+.sidebar-toggle svg {
+    width: 20px;
+    height: 20px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* Navigation Menu */
+.sidebar-nav {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+}
+
+.nav-section {
+    margin-bottom: 24px;
+}
+
+.nav-section-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    padding: 8px 12px;
+    margin-bottom: 4px;
+}
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 0.95rem;
+    font-weight: 500;
+    border: none;
+    background: transparent;
+    width: 100%;
+    text-align: left;
+    margin-bottom: 2px;
+}
+
+.nav-item:hover {
+    background: var(--bg);
+    transform: none;
+}
+
+.nav-item.active {
+    background: var(--primary);
+    color: white;
+}
+
+.nav-item-icon {
+    font-size: 1.25rem;
+    line-height: 1;
+    width: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.nav-item-text {
+    flex: 1;
+}
+
+.nav-item-badge {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* Sidebar Footer */
+.sidebar-footer {
+    padding: 12px;
+    border-top: 1px solid var(--border);
+}
+
+/* Main Content Area */
+.main-content {
+    margin-left: 260px;
+    min-height: 100vh;
+    transition: margin-left 0.3s ease;
+}
+
+.main-content.expanded {
+    margin-left: 0;
+}
+
+/* Mobile Sidebar Toggle */
+.mobile-sidebar-toggle {
+    display: none;
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 56px;
+    height: 56px;
+    background: var(--primary);
+    border: none;
+    border-radius: 50%;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+    z-index: 99;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.5rem;
+    transition: all 0.3s;
+}
+
+.mobile-sidebar-toggle:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.mobile-sidebar-toggle.active {
+    background: var(--primary-hover);
+}
+
+/* Sidebar Overlay (Mobile) */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 99;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.sidebar-overlay.active {
+    display: block;
+    opacity: 1;
+}
+
+/* Content Pages */
+.content-page {
+    display: none;
+    padding: 32px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.content-page.active {
+    display: block;
+    animation: fadeIn 0.3s ease;
+}
+
+/* Page Header */
+.page-header {
+    margin-bottom: 32px;
+}
+
+.page-header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0 0 8px 0;
+    color: var(--text);
+}
+
+.page-header p {
+    font-size: 1rem;
+    color: var(--muted);
+    margin: 0;
+}
+
+/* Desktop: Hide old tab navigation */
+.tab-nav {
+    display: none;
+}
+
+.tab-container {
+    margin: 0;
+    padding: 0;
+    max-width: none;
+}
+
+.tab-content {
+    display: none;
+}
+
+/* Responsive Behavior */
+@media (max-width: 968px) {
+    .sidebar {
+        width: 280px;
+        transform: translateX(-280px);
+    }
+
+    .sidebar.mobile-open {
+        transform: translateX(0);
+    }
+
+    .main-content {
+        margin-left: 0;
+    }
+
+    .mobile-sidebar-toggle {
+        display: flex;
+    }
+
+    .content-page {
+        padding: 24px;
+    }
+}
+
+@media (max-width: 480px) {
+    .sidebar {
+        width: 100%;
+        transform: translateX(-100%);
+    }
+
+    .sidebar.mobile-open {
+        transform: translateX(0);
+    }
+
+    .content-page {
+        padding: 16px;
+    }
+
+    .page-header h1 {
+        font-size: 1.5rem;
+    }
+
+    .page-header {
+        margin-bottom: 24px;
+    }
+
+    /* Adjust sidebar header for mobile */
+    .sidebar-header {
+        padding: 16px;
+    }
+
+    .sidebar-logo {
+        width: 40px;
+        height: 40px;
+    }
+
+    .sidebar-brand h1 {
+        font-size: 1.1rem;
+    }
+
+    /* Larger touch targets on mobile */
+    .nav-item {
+        padding: 14px 12px;
+        font-size: 1rem;
+    }
+
+    .nav-item-icon {
+        font-size: 1.4rem;
+        width: 28px;
+    }
+
+    .mobile-sidebar-toggle {
+        bottom: 16px;
+        right: 16px;
+        width: 52px;
+        height: 52px;
+    }
+}
+
+/* Collapsed Sidebar State (Desktop Only) */
+@media (min-width: 969px) {
+    .sidebar.collapsed {
+        transform: translateX(0);
+        width: 72px;
+    }
+
+    .sidebar.collapsed .sidebar-brand,
+    .sidebar.collapsed .nav-section-title,
+    .sidebar.collapsed .nav-item-text,
+    .sidebar.collapsed .nav-item-badge {
+        display: none;
+    }
+
+    .sidebar.collapsed .sidebar-header {
+        justify-content: center;
+    }
+
+    .sidebar.collapsed .sidebar-toggle {
+        transform: rotate(180deg);
+    }
+
+    .sidebar.collapsed .nav-item {
+        justify-content: center;
+        padding: 12px;
+    }
+
+    .sidebar.collapsed .nav-item-icon {
+        margin: 0;
+    }
+
+    .main-content.expanded {
+        margin-left: 72px;
+    }
+}
+
+/* Smooth scrollbar for sidebar */
+.sidebar-nav::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar-nav::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+    background: var(--border-light);
+}

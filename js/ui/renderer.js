@@ -335,109 +335,138 @@ class UIRenderer {
    * Render intensity doughnut chart
    */
   renderIntensityChart(runs) {
-    const canvas = document.getElementById('intensityChart');
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    const existing = Chart.getChart(canvas);
-    if (existing) existing.destroy();
-
-    // Get chart range settings
-    const chartSettings = window.settingsManager.getChartRanges();
-    const weeksToShow = chartSettings.intensityChartWeeks;
-    const daysToShow = weeksToShow * 7;
-
-    const runsInRange = window.dataProcessor.getRunsInRange(daysToShow);
-    const distribution = window.hrAnalyzer.calculateZoneDistribution(runsInRange);
-
-    // Update chart title
-    const chartTitle = document.querySelector('#intensityChart').closest('.panel').querySelector('h2');
-    if (chartTitle) {
-      chartTitle.textContent = `Intensity (Last ${weeksToShow} Week${weeksToShow !== 1 ? 's' : ''})`;
-    }
-
-    if (distribution.totalDataPoints === 0) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.font = '16px system-ui';
-      ctx.fillStyle = '#9aa0a6';
-      ctx.textAlign = 'center';
-      ctx.fillText(`No detailed HR data available for the last ${weeksToShow} week${weeksToShow !== 1 ? 's' : ''}`, canvas.width / 2, canvas.height / 2);
-      return;
-    }
-
-    const zones = ['z1', 'z2', 'z3', 'z4', 'z5', 'z6'];
-    const labels = zones.map((_, i) => window.hrAnalyzer.getZoneLabel(i + 1));
-    const data = zones.map(z => distribution.percentages[z]);
-    const distances = zones.map(z => distribution.distances[z]);
-
-    const colors = [
-      'rgba(189, 189, 189, 0.8)',
-      'rgba(66, 133, 244, 0.8)',
-      'rgba(52, 168, 83, 0.8)',
-      'rgba(255, 153, 0, 0.8)',
-      'rgba(234, 67, 53, 0.8)',
-      'rgba(156, 39, 176, 0.8)'
-    ];
-
-    new Chart(ctx, {
-      type: 'doughnut',
-      data: {
-        labels,
-        datasets: [{
-          data,
-          backgroundColor: colors,
-          borderWidth: 2
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: true,
-        cutout: '50%',
-        plugins: {
-          legend: {
-            display: true,
-            position: 'right',
-            labels: {
-              color: '#e8eaed',
-              padding: 12,
-              font: { size: 12 },
-              generateLabels: (chart) => {
-                return chart.data.labels.map((label, i) => {
-                  const value = chart.data.datasets[0].data[i];
-                  if (value < 0.1) return null;
-                  const zoneName = label.split(':')[0];
-                  return {
-                    text: `${zoneName}: ${value.toFixed(1)}% | ${distances[i].toFixed(1)} km`,
-                    fillStyle: colors[i],
-                    hidden: false,
-                    index: i
-                  };
-                }).filter(Boolean);
-              }
+      const canvas = document.getElementById('intensityChart');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const existing = Chart.getChart(canvas);
+      if (existing) existing.destroy();
+  
+      // Get chart range settings
+      const chartSettings = window.settingsManager.getChartRanges();
+      const weeksToShow = chartSettings.intensityChartWeeks;
+      const daysToShow = weeksToShow * 7;
+      const runsInRange = window.dataProcessor.getRunsInRange(daysToShow);
+      const distribution = window.hrAnalyzer.calculateZoneDistribution(runsInRange);
+  
+      // Update chart title
+      const chartTitle = document.querySelector('#intensityChart').closest('.panel').querySelector('h2');
+      if (chartTitle) {
+        chartTitle.textContent = `Intensity (Last ${weeksToShow} Week${weeksToShow !== 1 ? 's' : ''})`;
+      }
+  
+      if (distribution.totalDataPoints === 0) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.font = '16px system-ui';
+        ctx.fillStyle = '#9aa0a6';
+        ctx.textAlign = 'center';
+        ctx.fillText(`No detailed HR data available for the last ${weeksToShow} week${weeksToShow !== 1 ? 's' : ''}`, canvas.width / 2, canvas.height / 2);
+        return;
+      }
+  
+      const zones = ['z1', 'z2', 'z3', 'z4', 'z5', 'z6'];
+      const labels = zones.map((_, i) => window.hrAnalyzer.getZoneLabel(i + 1));
+      const data = zones.map(z => distribution.percentages[z]);
+      const distances = zones.map(z => distribution.distances[z]);
+      const colors = [
+        'rgba(189, 189, 189, 0.8)',
+        'rgba(66, 133, 244, 0.8)',
+        'rgba(52, 168, 83, 0.8)',
+        'rgba(255, 153, 0, 0.8)',
+        'rgba(234, 67, 53, 0.8)',
+        'rgba(156, 39, 176, 0.8)'
+      ];
+  
+      // Get CSS variable for text color
+      const textColor = getComputedStyle(document.documentElement)
+        .getPropertyValue('--text').trim() || '#e8eaed';
+  
+      // Determine legend position based on screen size
+      const isSmallScreen = window.innerWidth < 768;
+  
+      new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels,
+          datasets: [{
+            data,
+            backgroundColor: colors,
+            borderWidth: 2,
+            borderColor: '#202124'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          cutout: '50%',
+          layout: {
+            padding: {
+              top: 10,
+              bottom: 10,
+              left: 10,
+              right: 10
             }
           },
-          tooltip: {
-            callbacks: {
-              label: (context) => {
-                const percent = context.parsed.toFixed(1);
-                return `Time: ${percent}%`;
-              },
-              afterLabel: (context) => {
-                const distance = distances[context.dataIndex];
-                return `Distance: ${distance.toFixed(1)} km`;
+          plugins: {
+            legend: {
+              display: true,
+              position: isSmallScreen ? 'bottom' : 'right',
+              labels: {
+                color: textColor,
+                padding: 12,
+                font: { 
+                  size: 12,
+                  family: 'system-ui, -apple-system, sans-serif'
+                },
+                usePointStyle: false,
+                boxWidth: 15,
+                boxHeight: 15,
+                generateLabels: (chart) => {
+                  return chart.data.labels.map((label, i) => {
+                    const value = chart.data.datasets[0].data[i];
+                    if (value < 0.1) return null;
+                    const zoneName = label.split(':')[0];
+                    return {
+                      text: `${zoneName}: ${value.toFixed(1)}% | ${distances[i].toFixed(1)} km`,
+                      fillStyle: colors[i],
+                      strokeStyle: colors[i],
+                      fontColor: textColor, // Add this
+                      hidden: false,
+                      index: i
+                    };
+                  }).filter(Boolean);
+                }
               }
+            },
+            tooltip: {
+              backgroundColor: 'rgba(0, 0, 0, 0.8)',
+              titleColor: textColor,
+              bodyColor: textColor,
+              borderColor: '#444',
+              borderWidth: 1,
+              callbacks: {
+                label: (context) => {
+                  const percent = context.parsed.toFixed(1);
+                  return `Time: ${percent}%`;
+                },
+                afterLabel: (context) => {
+                  const distance = distances[context.dataIndex];
+                  return `Distance: ${distance.toFixed(1)} km`;
+                }
+              }
+            },
+            datalabels: {
+              color: '#ffffff',
+              font: { weight: 'bold', size: 14 },
+              formatter: (value) => value < 2 ? '' : value.toFixed(1) + '%',
+              offset: 0,
+              anchor: 'center',
+              align: 'center'
             }
-          },
-          datalabels: {
-            color: '#ffffff',
-            font: { weight: 'bold', size: 16 },
-            formatter: (value) => value < 2 ? '' : value.toFixed(1) + '%'
           }
-        }
-      },
-      plugins: [ChartDataLabels]
-    });
-  }
+        },
+        plugins: [ChartDataLabels]
+      });
+    }
 
   /**
    * Render timeline
@@ -604,46 +633,42 @@ class UIRenderer {
    * Render training load analysis
    */
   renderTrainingLoadAnalysis(runs) {
-    const container = document.getElementById('trainingLoadAnalysis');
-    if (!container) return;
-
-    const analysis = window.trainingLoadAnalyzer.analyze(runs);
+  const container = document.getElementById('trainingLoadAnalysis');
+  if (!container) return;
+  const analysis = window.trainingLoadAnalyzer.analyze(runs);
+  
+  const statusIcon = {
+    'green': '🟢',
+    'yellow': '🟡',
+    'red': '🔴'
+  };
+  let html = '<div class="training-analysis">';
+  
+  Object.values(analysis).forEach(item => {
+    // Escape HTML for tooltip and convert newlines to <br>
+    const tooltipHTML = item.tooltip
+      .replace(/\n/g, '<br>')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/&lt;strong&gt;/g, '<strong>')
+      .replace(/&lt;\/strong&gt;/g, '</strong>')
+      .replace(/&lt;br&gt;/g, '<br>');
     
-    const statusIcon = {
-      'green': '🟢',
-      'yellow': '🟡',
-      'red': '🔴'
-    };
-
-    let html = '<div class="training-analysis">';
-    
-    Object.values(analysis).forEach(item => {
-      // Escape HTML for tooltip and convert newlines to <br>
-      const tooltipHTML = item.tooltip
-        .replace(/\n/g, '<br>')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/&lt;strong&gt;/g, '<strong>')
-        .replace(/&lt;\/strong&gt;/g, '</strong>')
-        .replace(/&lt;br&gt;/g, '<br>');
-      
-      html += `
-        <div class="analysis-card ${item.status}">
-          <div class="analysis-header">
-            <span class="status-icon-wrapper" title="Click for details">
-              <span class="status-icon">${statusIcon[item.status]}</span>
-              <div class="analysis-tooltip">${tooltipHTML}</div>
-            </span>
-            <h3>${item.metric}</h3>
-          </div>
-          <p class="analysis-message">${item.message}</p>
+    html += `
+      <div class="analysis-card ${item.status}">
+        <div class="analysis-header">
+          <span class="status-icon">${statusIcon[item.status]}</span>
+          <h3>${item.metric}</h3>
         </div>
-      `;
-    });
-    
-    html += '</div>';
-    container.innerHTML = html;
-  }
+        <p class="analysis-message">${item.message}</p>
+        <div class="analysis-tooltip">${tooltipHTML}</div>
+      </div>
+    `;
+  });
+  
+  html += '</div>';
+  container.innerHTML = html;
+}
 }
 
 // Initialize and export singleton

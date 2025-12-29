@@ -3,9 +3,9 @@
     position: relative;
     background: linear-gradient(145deg, #4a90e2, #357abd);
     border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 24px;
-    margin-bottom: 2rem;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 0.5rem;
     box-shadow: var(--shadow);
     transition: border-color 0.2s ease;
 }
@@ -34,7 +34,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 20px;
+    margin-bottom: 0px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
@@ -262,7 +262,7 @@
     background: linear-gradient(135deg, #0e1117 0%, #13151c 100%);
     border: 1px solid var(--border);
     border-radius: 12px;
-    padding: 20px;
+    padding: 10px;
     transition: all 0.2s ease;
 }
 

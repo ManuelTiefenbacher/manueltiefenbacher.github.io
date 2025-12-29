@@ -97,6 +97,17 @@ button.secondary:hover {
     transform: translateY(0);
 }
 
+preset-button {
+    color: white;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    margin-top: 0px;
+    margin-right: 8px;
+}
+
 /* ===== VISUALIZATION PRESETS (TAB STYLE) ===== */
 .preset-selector-container {
     margin-bottom: 1.5rem;
@@ -104,14 +115,10 @@ button.secondary:hover {
 
 .preset-tabs {
     display: flex;
-    gap: 0.5rem;
-    background: var(--panel);
-    padding: 8px;
-    border-radius: 12px;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
-    border: 1px solid var(--border);
+    height: 40px;
 }
 
 .preset-tabs::-webkit-scrollbar {
@@ -119,13 +126,10 @@ button.secondary:hover {
 }
 
 .preset-tab {
+    background: var(--background);
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 10px 16px;
-    background: transparent;
-    border: none;
-    border-radius: 8px;
+    border: none;    
     cursor: pointer;
     transition: all 0.3s ease;
     font-family: inherit;
@@ -136,6 +140,7 @@ button.secondary:hover {
     flex-shrink: 0;
     position: relative;
     overflow: hidden;
+    height: 40px;
 }
 
 .preset-tab::before {
@@ -156,7 +161,7 @@ button.secondary:hover {
 }
 
 .preset-tab.active {
-    background: var(--bg);
+    background: var(--panel);
     color: var(--primary);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }

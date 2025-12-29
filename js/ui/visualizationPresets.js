@@ -78,8 +78,14 @@ class VisualizationPresets {
 
     container.innerHTML = '';
 
+    const label = document.createElement('preset-tab-name');
+    label.className = 'preset-tab';
+    label.innerHTML = `Select Preset: `;
+    label.style.margin = '0px 20px';
+    container.appendChild(label);
+
     Object.entries(this.presets).forEach(([key, preset]) => {
-      const tab = document.createElement('button');
+      const tab = document.createElement('preset-button');
       tab.className = `preset-tab ${key === this.currentPreset ? 'active' : ''}`;
       tab.innerHTML = `
         <span class="preset-tab-icon">${preset.icon}</span>
@@ -87,7 +93,19 @@ class VisualizationPresets {
       `;
       tab.addEventListener('click', () => this.selectPreset(key));
       container.appendChild(tab);
+      
+      const hr = document.createElement('hr');
+      hr.style.margin = '20px 0px';
+      hr.style.width = '20px';
+      hr.style.transform = 'rotate(90deg)';
+      container.appendChild(hr);
+
     });
+    
+if (container.lastChild) {
+  container.removeChild(container.lastChild);
+}
+
   }
 
   /**
@@ -132,7 +150,7 @@ class VisualizationPresets {
         // Use setTimeout to stagger the animations
         setTimeout(() => {
           panel.style.display = 'block';
-          panel.style.animation = 'fadeInUp 0.4s ease-out';
+          panel.style.animation = 'fadeIn 0.4s ease-out';
         }, index * 100);
       }
     });

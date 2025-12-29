@@ -79,7 +79,8 @@
     pointer-events: none;
 }
 
-.status-icon-wrapper:hover .analysis-tooltip {
+.analysis-card:hover .analysis-tooltip {
+    display: block;
     visibility: visible;
     opacity: 1;
 }
