@@ -29,23 +29,25 @@
 
 <body>
   <header>
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0rem; margin-top: 0rem;">
-        <img src="logo2.png"; width="100">
+    <div style="display: grid; grid-template-columns: auto auto auto;">
+        <img src="logo2.png"; width="75">
         <!-- Session Info Banners -->
-        <div id="sessionInfo" style="display: none; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); height: 60px; color: white; padding: 12px 20px; border-radius: 8px; margin-top: 20px; align-items: center; justify-content: space-between;">
-            <span style="font-weight: 600;">📦 Data from previous session loaded from cache</span>
-            <button onclick="clearAndReload()" style="background: rgba(255,255,255,0.2); color: white; padding: 8px 20px; margin-top: 1px; border: 2px solid white; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s;">Clear Data</button>
-        </div>
+        <div>
+            <div id="sessionInfo" style="display: none; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 20px; border-radius: 8px; margin-right: 75px; align-items: center; justify-content: space-between;">
+                <span style="font-weight: 600;">📦 Data from previous session loaded from cache</span>
+                <button onclick="clearAndReload()" style="background: rgba(255,255,255,0.2); color: white; padding: 8px 20px; margin-top: 1px; border: 2px solid white; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s;">Clear Data</button>
+            </div>
     
-        <div id="stravaSessionInfo" style="display: none; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 20px; border-radius: 8px; margin-bottom: 12px; align-items: center; justify-content: space-between;">
-            <span style="font-weight: 600;">🏃 <span id="stravaActivityCount">0</span> Strava activities from previous session loaded from cache</span>
-            <button onclick="clearStravaData()" style="background: rgba(255,255,255,0.2); color: white; padding: 8px 16px; border: 2px solid white; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s;">Clear Strava Data</button>
-        </div>
+            <div id="stravaSessionInfo" style="display: none; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 20px; border-radius: 8px; margin-right: 75px; align-items: center; justify-content: space-between;">
+                <span style="font-weight: 600;">🏃 <span id="stravaActivityCount">0</span> Strava activities from previous session loaded from cache</span>
+                <button onclick="clearStravaData()" style="background: rgba(255,255,255,0.2); color: white; padding: 8px 16px; border: 2px solid white; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s;">Clear Strava Data</button>
+            </div>
 
-        <div class="progress-container" id="progressContainer" style="display: none; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 20px; border-radius: 8px; margin-bottom: 12px; align-items: center; justify-content: space-between;">
-            <div class="progress-text" id="progressText">Processing files...</div>
-            <div class="progress-bar">
-            <div class="progress-fill" id="progressFill"></div>
+            <div class="progress-container" id="progressContainer" style="display: none; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 20px; border-radius: 8px; margin-right: 75px; align-items: center; justify-content: space-between;">
+                <div class="progress-text" id="progressText">Processing files...</div>
+                <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -447,7 +449,7 @@
   
   <!-- 1. Core utilities (no dependencies) -->
   <script src="js/utils/helpers.js"></script>
-  <script src="js/ui/feedback.js"></script>mobileMenu
+  <script src="js/ui/feedback.js"></script>
   <script src="js/ui/mobileMenu.js"></script>
   
   <!-- 2. Storage layer -->
