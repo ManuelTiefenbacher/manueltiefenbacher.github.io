@@ -8,12 +8,13 @@
     body {
         font-size: 14px;
         line-height: 1.5;
-        padding: 0 12px;
+        padding: 0;
     }
 
     /* Header */
     header { 
-        padding: 10px 16px; 
+        padding: 10px 16px;
+        position: relative;
     }
     
     header h1 { 
@@ -24,12 +25,103 @@
         font-size: 0.85rem; 
     }
 
-    /* Containers & panels */
-    .tab-container,
+    /* Mobile burger menu */
+    .mobile-menu-toggle {
+        display: block;
+        position: absolute;
+        top: 50%;
+        right: 16px;
+        transform: translateY(-50%);
+        background: transparent;
+        border: none;
+        width: 40px;
+        height: 40px;
+        padding: 8px;
+        cursor: pointer;
+        z-index: 1001;
+    }
+
+    .mobile-menu-toggle span {
+        display: block;
+        width: 100%;
+        height: 3px;
+        background: var(--text);
+        border-radius: 2px;
+        transition: all 0.3s ease;
+        margin: 5px 0;
+    }
+
+    .mobile-menu-toggle.active span:nth-child(1) {
+        transform: rotate(45deg) translate(7px, 7px);
+    }
+
+    .mobile-menu-toggle.active span:nth-child(2) {
+        opacity: 0;
+    }
+
+    .mobile-menu-toggle.active span:nth-child(3) {
+        transform: rotate(-45deg) translate(7px, -7px);
+    }
+
+    /* Hide desktop navigation */
+    .tab-nav {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100vh;
+        background: var(--panel);
+        flex-direction: column;
+        padding: 80px 20px 20px;
+        z-index: 1000;
+        overflow-y: auto;
+        gap: 0;
+        border-radius: 0;
+        border-bottom: none;
+        margin-bottom: 0;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+    }
+
+    .tab-nav.mobile-open {
+        display: flex;
+        transform: translateX(0);
+    }
+
+    .tab-button {
+        width: 100%;
+        padding: 1rem 1.5rem;
+        text-align: left;
+        border-radius: 8px;
+        border-bottom: none;
+        margin-bottom: 0.5rem;
+        font-size: 1rem;
+    }
+
+    .tab-button.active {
+        background: var(--primary);
+        color: white;
+    }
+
+    /* Containers & panels - remove boxes for more space */
+    .tab-container {
+        padding: 0;
+        margin: 0;
+    }
+
     .panel {
         padding: 16px;
-        margin: 1rem 0;
-        border-radius: 12px;
+        margin: 0;
+        border-radius: 0;
+        border: none;
+        border-bottom: 1px solid var(--border);
+        box-shadow: none;
+        background: transparent;
+    }
+
+    .panel:hover {
+        border-color: var(--border);
     }
 
     /* Tabs: touch-friendly, scrollable */
@@ -107,9 +199,19 @@
         grid-template-columns: 1fr !important;
     }
 
-    /* Activity list spacing */
+    /* Activity list spacing - remove boxes */
     .activity-item { 
-        padding: 16px; 
+        padding: 16px;
+        border-radius: 0;
+        border: none;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 0;
+    }
+
+    .activity-item:hover {
+        border-color: var(--border);
+        box-shadow: none;
+        background: var(--panel-hover);
     }
     
     .activity-header { 
@@ -168,9 +270,13 @@
         max-height: 95vh;
     }
 
-    /* Info box: reduce spacing */
+    /* Info box: reduce spacing and remove border radius */
     .info-box { 
-        padding: 16px; 
+        padding: 16px;
+        margin: 0;
+        border-radius: 0;
+        border-left: none;
+        border-right: none;
     }
     
     .info-title { 
@@ -189,10 +295,25 @@
         width: 100%; 
     }
 
-    /* Preset tabs: better mobile scrolling */
+    /* Athlete info: remove boxes */
+    .athlete-info {
+        padding: 0;
+        background: transparent;
+        border-radius: 0;
+    }
+
+    .stat-card {
+        border-radius: 0;
+    }
+
+    /* Preset tabs: remove box */
     .preset-tabs {
-        padding: 6px;
+        padding: 6px 16px;
         gap: 0.25rem;
+        background: transparent;
+        border-radius: 0;
+        border: none;
+        border-bottom: 1px solid var(--border);
     }
     
     .preset-tab {
@@ -204,7 +325,20 @@
         font-size: 1.1rem;
     }
 
-    /* Stats cards: larger text for readability */
+    /* Stats cards: remove boxes */
+    .stat {
+        border-radius: 0;
+        border: none;
+        border-bottom: 1px solid var(--border);
+        box-shadow: none;
+        background: transparent;
+    }
+
+    .stat:hover {
+        transform: none;
+        box-shadow: none;
+    }
+
     .stat .label {
         font-size: 0.8rem;
     }
@@ -213,10 +347,18 @@
         font-size: 1.5rem;
     }
 
-    /* Run items: adjust padding and typography */
+    /* Run items: remove boxes */
     .run {
-        padding: 12px 14px;
+        padding: 12px 16px;
         font-size: 0.9rem;
+        border-radius: 0;
+        border: none;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .run:hover {
+        transform: none;
+        box-shadow: none;
     }
 
     /* Badge sizing */
@@ -240,10 +382,22 @@
         padding: 0.75rem;
     }
 
-    /* Progress bar: adjust size */
+    /* Timeline: remove box */
+    .timeline {
+        padding: 0;
+        background: transparent;
+        border-radius: 0;
+        margin-top: 0;
+    }
+
+    /* Progress bar: remove box */
     .progress-container {
-        padding: 12px;
-        margin-top: 12px;
+        padding: 12px 16px;
+        margin-top: 0;
+        background: transparent;
+        border-radius: 0;
+        border: none;
+        border-bottom: 1px solid var(--border);
     }
     
     .progress-text {
@@ -254,9 +408,19 @@
         height: 6px;
     }
 
-    /* Analysis cards: stack better */
+    /* Analysis cards: remove boxes */
     .analysis-card {
         padding: 16px;
+        border-radius: 0;
+        border: none;
+        border-bottom: 1px solid var(--border);
+        box-shadow: none;
+        background: transparent;
+    }
+
+    .analysis-card:hover {
+        transform: none;
+        box-shadow: none;
     }
     
     .analysis-header {
@@ -293,9 +457,12 @@
         font-size: 14px;
     }
 
-    /* Detail items: adjust spacing */
+    /* Detail items: remove boxes */
     .detail-item {
-        padding: 12px;
+        padding: 12px 0;
+        background: transparent;
+        border-radius: 0;
+        border-bottom: 1px solid var(--border);
     }
     
     .detail-label {
@@ -338,16 +505,30 @@
         min-height: 44px; /* Apple's recommended minimum touch target */
     }
 
-    /* Improve readability of stats */
+    /* Comparison stats: remove boxes */
     .comparison-stats-grid {
-        padding: 12px;
-        margin: 16px 0;
+        padding: 0;
+        margin: 0;
+        background: transparent;
+        border-radius: 0;
     }
 
-    /* Better mobile experience for instructions list */
+    .comparison-row {
+        padding: 16px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .comparison-row:hover {
+        background: var(--panel-hover);
+    }
+
+    /* Instructions: remove boxes */
     .instructions-list {
-        padding: 1rem;
-        margin: 0.75rem 0;
+        padding: 1rem 16px;
+        margin: 0;
+        border-radius: 0;
+        border-left: none;
+        border-right: none;
     }
     
     .instructions-list ol {

@@ -25,6 +25,5 @@ canvas {
 }
 
 #chart {
-    height: 400px !important;
     min-height: 400px;
 }
