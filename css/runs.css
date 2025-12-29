@@ -1,0 +1,166 @@
+/* ===== TIMELINE & RUNS ===== */
+.timeline {
+    display: grid;
+    gap: 10px;
+    margin-top: 1rem;
+    padding: 1rem;
+    background: var(--bg);
+    border-radius: 8px;
+    min-height: 200px;
+}
+
+.run {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 18px;
+    border-radius: 10px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+    background: var(--panel);
+}
+
+.run:hover {
+    transform: translateX(4px);
+    box-shadow: var(--shadow);
+    border-color: var(--border-light);
+    background: var(--panel-hover);
+}
+
+.run:hover .tooltip {
+    display: block;
+    opacity: 1;
+}
+
+/* Run classification colors */
+.run.Z2 {
+    background: linear-gradient(90deg, color-mix(in srgb, var(--z2) 25%, transparent) 0%, color-mix(in srgb, var(--z2) 15%, transparent) 100%);
+}
+
+.run.Long {
+    background: linear-gradient(90deg, color-mix(in srgb, var(--long) 25%, transparent) 0%, color-mix(in srgb, var(--long) 15%, transparent) 100%);
+}
+
+.run.Intervalle {
+    background: linear-gradient(90deg, color-mix(in srgb, var(--interval) 25%, transparent) 0%, color-mix(in srgb, var(--interval) 15%, transparent) 100%);
+}
+
+.run.AllOut {
+    background: linear-gradient(90deg, color-mix(in srgb, var(--allout) 25%, transparent) 0%, color-mix(in srgb, var(--allout) 15%, transparent) 100%);
+}
+
+.run.Mixed {
+    background: linear-gradient(90deg, color-mix(in srgb, var(--mixed) 25%, transparent) 0%, color-mix(in srgb, var(--mixed) 15%, transparent) 100%);
+}
+
+.run.Dirty {
+    outline: 2px solid var(--dirty);
+    outline-offset: -2px;
+}
+
+.run.z2 {
+    border-left: 4px solid #34a853;
+}
+
+.run.intensity-effort {
+    border-left: 4px solid #fbbc04;
+}
+
+.run.race-effort {
+    border-left: 4px solid #ea4335;
+}
+
+.run.mixed-effort {
+    border-left: 4px solid #9aa0a6;
+}
+
+/* ===== BADGES ===== */
+.badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-left: 6px;
+    opacity: 0.9;
+}
+
+.badge.no-hr {
+    background: #ea4335;
+    color: white;
+    font-size: 0.75rem;
+}
+
+.badge.basic-hr {
+    background: #fbbc04;
+    color: black;
+}
+
+.badge.long-run {
+    background: #34a853;
+    color: white;
+}
+
+.badge.interval-badge {
+    background: linear-gradient(135deg, #fbbc04 0%, #ff9800 100%);
+    color: #000;
+    font-weight: 700;
+    animation: pulse 2s ease-in-out infinite;
+    box-shadow: 0 2px 8px rgba(251, 188, 4, 0.4);
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.9;
+        transform: scale(1.05);
+    }
+}
+
+.badge.interval-badge:hover {
+    animation: none;
+    transform: scale(1.1);
+}
+
+/* ===== TOOLTIPS ===== */
+.tooltip {
+    display: none;
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    margin-bottom: 12px;
+    background: var(--panel-hover);
+    border: 1px solid var(--border-light);
+    border-radius: 12px;
+    padding: 16px;
+    font-size: 0.9rem;
+    z-index: 100;
+    min-width: 320px;
+    max-width: 450px;
+    box-shadow: var(--shadow-lg);
+    animation: fadeIn 0.2s ease;
+}
+
+.tooltip-row {
+    display: flex;
+    justify-content: space-between;
+    margin: 6px 0;
+    padding: 4px 0;
+}
+
+.tooltip-label {
+    color: var(--muted);
+    font-weight: 500;
+}
+
+.tooltip-value {
+    font-weight: 600;
+    color: var(--text);
+    text-align: right;
+}

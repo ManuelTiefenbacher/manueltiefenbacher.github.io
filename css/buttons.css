@@ -1,0 +1,175 @@
+/* ===== BUTTONS ===== */
+button {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    margin-top: 12px;
+}
+
+button:hover {
+    background: var(--primary-hover);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+button:active {
+    transform: translateY(0);
+}
+
+button:disabled {
+    background: var(--muted);
+    cursor: not-allowed;
+    transform: none;
+}
+
+button.secondary {
+    background: var(--border);
+    color: var(--text);
+}
+
+button.secondary:hover {
+    background: var(--border-light);
+}
+
+.logout-btn {
+    background: #ea4335;
+    margin-top: 2rem;
+}
+
+.logout-btn:hover {
+    background: #c5371d;
+}
+
+.actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-top: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.actions button {
+    margin-top: 0;
+}
+
+.status {
+    color: #34a853;
+    font-weight: 600;
+}
+
+/* ===== NAVIGATION BUTTONS ===== */
+.nav-buttons {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 2px solid var(--border);
+}
+
+/* ===== PRESET BUTTONS ===== */
+.preset-btn {
+    background: var(--border);
+    color: var(--text);
+    border: 2px solid var(--border-light);
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    margin: 0;
+}
+
+.preset-btn:hover {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
+    transform: translateY(-2px);
+}
+
+.preset-btn:active {
+    transform: translateY(0);
+}
+
+/* ===== VISUALIZATION PRESETS (TAB STYLE) ===== */
+.preset-selector-container {
+    margin-bottom: 1.5rem;
+}
+
+.preset-tabs {
+    display: flex;
+    gap: 0.5rem;
+    background: var(--panel);
+    padding: 8px;
+    border-radius: 12px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    border: 1px solid var(--border);
+}
+
+.preset-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.preset-tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: inherit;
+    color: var(--muted);
+    font-size: 0.9rem;
+    font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+}
+
+.preset-tab::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--primary);
+    transform: scaleX(0);
+    transition: transform 0.3s ease;
+}
+
+.preset-tab:hover {
+    background: var(--bg);
+    color: var(--text);
+}
+
+.preset-tab.active {
+    background: var(--bg);
+    color: var(--primary);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.preset-tab.active::before {
+    transform: scaleX(1);
+}
+
+.preset-tab-icon {
+    font-size: 1.25rem;
+    line-height: 1;
+}
+
+.preset-tab-name {
+    font-weight: 600;
+}

@@ -1,0 +1,31 @@
+/* ===== CSS VARIABLES & THEME ===== */
+:root {
+    /* Background colors */
+    --bg: #0a0c10;
+    --panel: #13151c;
+    --panel-hover: #181b23;
+    
+    /* Text colors */
+    --text: #e8eaed;
+    --muted: #9aa0a6;
+    
+    /* Border colors */
+    --border: #2a2f3a;
+    --border-light: #383d4a;
+    
+    /* Primary colors */
+    --primary: #fc5200;
+    --primary-hover: #e04900;
+
+    /* Training zone colors */
+    --z2: #3ddc97;
+    --long: #8ab4f8;
+    --interval: #fbbc04;
+    --allout: #ea4335;
+    --mixed: #b39ddb;
+    --dirty: #ff7043;
+      
+    /* Shadows */
+    --shadow: 0 2px 8px rgba(0,0,0,0.3);
+    --shadow-lg: 0 8px 24px rgba(0,0,0,0.4);
+}

@@ -1,0 +1,362 @@
+/* ===== MOBILE-ONLY STYLES (480px and below) ===== */
+@media (max-width: 480px) {
+    /* Base & typography */
+    html { 
+        scroll-behavior: smooth; 
+    }
+    
+    body {
+        font-size: 14px;
+        line-height: 1.5;
+        padding: 0 12px;
+    }
+
+    /* Header */
+    header { 
+        padding: 10px 16px; 
+    }
+    
+    header h1 { 
+        font-size: 1.5rem; 
+    }
+    
+    header p { 
+        font-size: 0.85rem; 
+    }
+
+    /* Containers & panels */
+    .tab-container,
+    .panel {
+        padding: 16px;
+        margin: 1rem 0;
+        border-radius: 12px;
+    }
+
+    /* Tabs: touch-friendly, scrollable */
+    .tab-nav {
+        gap: 0.25rem;
+        padding: 0.5rem;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+    
+    .tab-nav::-webkit-scrollbar { 
+        display: none; 
+    }
+
+    .tab-button {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.85rem;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    /* Buttons & form inputs: larger tap targets */
+    button,
+    input[type="text"],
+    input[type="password"],
+    select {
+        font-size: 14px;
+        padding: 10px 14px;
+    }
+    
+    button { 
+        width: 100%; 
+    }
+
+    /* Input groups: stack nicely */
+    .input-group {
+        margin: 0.75rem 0;
+    }
+    
+    .input-group label {
+        display: block;
+        min-width: 0;
+        margin: 0 0 6px 0;
+    }
+
+    /* Zone fields */
+    .zone-field input[type="text"] {
+        width: 100%;
+        font-size: 15px;
+    }
+
+    /* Actions & navigation */
+    .actions { 
+        gap: 0.75rem; 
+    }
+    
+    .nav-buttons {
+        flex-direction: column;
+        gap: 1rem;
+        padding-top: 1.25rem;
+        border-top: 1px solid var(--border);
+    }
+    
+    .nav-buttons button { 
+        width: 100%; 
+    }
+
+    /* Grids → single column */
+    .stats,
+    .training-analysis,
+    .athlete-info,
+    .activity-stats,
+    .details-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Activity list spacing */
+    .activity-item { 
+        padding: 16px; 
+    }
+    
+    .activity-header { 
+        flex-direction: column; 
+        gap: 8px; 
+    }
+    
+    .activity-type { 
+        margin-top: 6px; 
+    }
+
+    /* Tooltips: hide on mobile for clarity */
+    .tooltip { 
+        display: none !important; 
+    }
+
+    /* Comparison view adjustments */
+    .comparison-header { 
+        display: none; 
+    }
+    
+    .comparison-row {
+        grid-template-columns: 1fr;
+        gap: 8px;
+        padding: 12px;
+    }
+    
+    .stat-label {
+        font-size: 0.9rem;
+        margin-bottom: 6px;
+    }
+    
+    .stat-value,
+    .stat-change {
+        justify-content: flex-start;
+    }
+    
+    .stat-value::before {
+        content: attr(data-label);
+        font-size: 0.75rem;
+        color: var(--muted);
+        margin-right: 8px;
+        font-weight: 400;
+    }
+
+    /* Charts: ensure fit */
+    canvas,
+    #chart {
+        max-height: 280px;
+        height: 280px !important;
+    }
+
+    /* Modals: tighter layout */
+    .modal-content {
+        width: 95%;
+        max-height: 95vh;
+    }
+
+    /* Info box: reduce spacing */
+    .info-box { 
+        padding: 16px; 
+    }
+    
+    .info-title { 
+        font-size: 20px; 
+    }
+    
+    .info-text { 
+        font-size: 14px; 
+    }
+    
+    .info-footer { 
+        flex-direction: column; 
+    }
+    
+    .info-button { 
+        width: 100%; 
+    }
+
+    /* Preset tabs: better mobile scrolling */
+    .preset-tabs {
+        padding: 6px;
+        gap: 0.25rem;
+    }
+    
+    .preset-tab {
+        padding: 8px 12px;
+        font-size: 0.85rem;
+    }
+    
+    .preset-tab-icon {
+        font-size: 1.1rem;
+    }
+
+    /* Stats cards: larger text for readability */
+    .stat .label {
+        font-size: 0.8rem;
+    }
+    
+    .stat .value {
+        font-size: 1.5rem;
+    }
+
+    /* Run items: adjust padding and typography */
+    .run {
+        padding: 12px 14px;
+        font-size: 0.9rem;
+    }
+
+    /* Badge sizing */
+    .badge {
+        padding: 3px 8px;
+        font-size: 0.75rem;
+        margin-left: 4px;
+    }
+
+    /* Instructions: better mobile UX */
+    .instructions-toggle {
+        padding: 0.75rem;
+        font-size: 0.95rem;
+    }
+    
+    .instructions-content {
+        padding: 0 0.75rem;
+    }
+    
+    .instructions-container.expanded .instructions-content {
+        padding: 0.75rem;
+    }
+
+    /* Progress bar: adjust size */
+    .progress-container {
+        padding: 12px;
+        margin-top: 12px;
+    }
+    
+    .progress-text {
+        font-size: 0.85rem;
+    }
+    
+    .progress-bar {
+        height: 6px;
+    }
+
+    /* Analysis cards: stack better */
+    .analysis-card {
+        padding: 16px;
+    }
+    
+    .analysis-header {
+        gap: 10px;
+    }
+    
+    .status-icon {
+        font-size: 20px;
+    }
+    
+    .analysis-header h3 {
+        font-size: 14px;
+    }
+    
+    .analysis-message {
+        font-size: 13px;
+    }
+
+    /* Activity details: improve readability */
+    .activity-name {
+        font-size: 16px;
+    }
+    
+    .activity-type {
+        font-size: 11px;
+        padding: 3px 10px;
+    }
+    
+    .stat-label-small {
+        font-size: 10px;
+    }
+    
+    .stat-value-small {
+        font-size: 14px;
+    }
+
+    /* Detail items: adjust spacing */
+    .detail-item {
+        padding: 12px;
+    }
+    
+    .detail-label {
+        font-size: 11px;
+    }
+    
+    .detail-value {
+        font-size: 16px;
+    }
+
+    /* Modal adjustments */
+    .modal-header,
+    .modal-body,
+    .modal-footer {
+        padding: 16px;
+    }
+    
+    .modal-header h2 {
+        font-size: 1.25rem;
+    }
+    
+    .close-btn {
+        font-size: 28px;
+        width: 36px;
+        height: 36px;
+    }
+
+    /* Comparison select: stack vertically */
+    .comparison-select-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    /* Ensure touch-friendly spacing */
+    button,
+    .tab-button,
+    .preset-tab,
+    input,
+    select {
+        min-height: 44px; /* Apple's recommended minimum touch target */
+    }
+
+    /* Improve readability of stats */
+    .comparison-stats-grid {
+        padding: 12px;
+        margin: 16px 0;
+    }
+
+    /* Better mobile experience for instructions list */
+    .instructions-list {
+        padding: 1rem;
+        margin: 0.75rem 0;
+    }
+    
+    .instructions-list ol {
+        margin-left: 1rem;
+        margin-top: 0.75rem;
+    }
+    
+    .instructions-list li {
+        margin: 0.5rem 0;
+        line-height: 1.6;
+    }
+}

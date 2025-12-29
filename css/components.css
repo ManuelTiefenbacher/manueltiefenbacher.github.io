@@ -1,0 +1,289 @@
+/* ===== INFO BOXES ===== */
+.info-box {
+    position: relative;
+    background: linear-gradient(145deg, #4a90e2, #357abd);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 2rem;
+    box-shadow: var(--shadow);
+    transition: border-color 0.2s ease;
+}
+
+.info-box::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 50%;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, transparent 100%);
+    border-radius: 16px 16px 0 0;
+}
+
+.info-box-content {
+    position: relative;
+    z-index: 1;
+}
+
+.info-icon {
+    width: 48px;
+    height: 48px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.info-icon svg {
+    width: 28px;
+    height: 28px;
+    stroke: white;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.info-title {
+    color: white;
+    font-size: 24px;
+    font-weight: 600;
+    margin-top: 5px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.info-text {
+    color: rgba(255, 255, 255, 0.95);
+    font-size: 15px;
+    line-height: 1.6;
+    margin: 0;
+}
+
+.info-footer {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    display: flex;
+    gap: 12px;
+}
+
+.info-button {
+    flex: 1;
+    padding: 10px 20px;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 8px;
+    color: white;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+}
+
+.info-button:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.info-box.success {
+    background: rgba(52, 168, 83, 0.1);
+    border-left-color: #34a853;
+}
+
+.info-box.warning {
+    background: rgba(251, 188, 4, 0.1);
+    border-left-color: #fbbc04;
+}
+
+.info-box.error {
+    background: rgba(234, 67, 53, 0.1);
+    border-left-color: #ea4335;
+}
+
+.info-box p {
+    margin: 0.5rem 0;
+    line-height: 1.6;
+}
+
+.info-box strong {
+    color: var(--text);
+}
+
+.info-box a {
+    color: #8ab4f8;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.info-box a:hover {
+    text-decoration: underline;
+}
+
+/* ===== INSTRUCTIONS ===== */
+.instructions-container {
+    margin: 1rem 0;
+    overflow: hidden;
+}
+
+.instructions-toggle {
+    width: 100%;
+    padding: 1rem;
+    background: rgba(251, 188, 4, 0.1);
+    border: none;
+    text-align: left;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background-color 0.2s;
+    margin-top: 2rem;
+}
+
+.instructions-toggle:hover {
+    background: rgba(251, 100, 4, 0.1);
+}
+
+.toggle-icon {
+    transition: transform 0.3s;
+    font-size: 0.8rem;
+}
+
+.instructions-container.expanded .toggle-icon {
+    transform: rotate(180deg);
+}
+
+.instructions-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out;
+    padding: 0 1rem;
+}
+
+.instructions-container.expanded .instructions-content {
+    max-height: 500px;
+    padding: 1rem;
+}
+
+.instructions-content ol {
+    margin: 0.5rem 0;
+    padding-left: 1.5rem;
+}
+
+.instructions-content li {
+    margin: 0.5rem 0;
+}
+
+.instructions-content a {
+    color: #fc5200;
+    text-decoration: none;
+}
+
+.instructions-content a:hover {
+    text-decoration: underline;
+}
+
+.instructions-list {
+    background: rgba(251, 188, 4, 0.1);
+    border-left: 4px solid var(--interval);
+    padding: 1.5rem;
+    margin: 1rem 0;
+    border-radius: 8px;
+}
+
+.instructions-list ol {
+    margin-left: 1.5rem;
+    margin-top: 1rem;
+}
+
+.instructions-list li {
+    margin: 0.75rem 0;
+    line-height: 1.8;
+}
+
+.instructions-list a {
+    color: #8ab4f8;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.instructions-list a:hover {
+    text-decoration: underline;
+}
+
+/* ===== PROGRESS BAR ===== */
+.progress-container {
+    display: none;
+    margin-top: 16px;
+    padding: 16px;
+    background: var(--bg);
+    border-radius: 10px;
+    border: 1px solid var(--border);
+}
+
+.progress-text {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--z2), var(--long));
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+/* ===== STATS GRID ===== */
+.stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin: 1.5rem 0;
+}
+
+.stat {
+    background: linear-gradient(135deg, #0e1117 0%, #13151c 100%);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    transition: all 0.2s ease;
+}
+
+.stat:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--border-light);
+}
+
+.stat .label {
+    color: var(--muted);
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-bottom: 8px;
+}
+
+.stat .value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text);
+}
