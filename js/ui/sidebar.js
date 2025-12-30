@@ -50,20 +50,83 @@ function initSidebar() {
 
     // Navigation items
     navItems.forEach(item => {
-        item.addEventListener('click', function(e) {
-            e.preventDefault();
-            const pageId = this.getAttribute('data-page');
-            
-            if (pageId) {
-                navigateToPage(pageId);
-                
-                // Close mobile sidebar after navigation
-                if (window.innerWidth <= 968) {
-                    closeMobileSidebar();
-                }
-            }
+        item.addEventListener('click', (e) => {
+          e.preventDefault();
+      
+          const page = item.getAttribute('data-page');
+          const sport = item.getAttribute('data-sport');
+      
+          // First, navigate to the analysis page
+          navigateToPage(page);
+      
+          // Then switch to the specific sport
+          if (sport && typeof switchSportType === 'function') {
+            setTimeout(() => {
+              switchSportType(sport);
+            }, 100);
+          }
+      
+          // Update active state in sidebar
+          document.querySelectorAll('.nav-item').forEach(nav => {
+            nav.classList.remove('active');
+          });
+          item.classList.add('active');
         });
     });
+
+      // Also handle regular nav items (without data-sport)
+      const regularNavItems = document.querySelectorAll('.nav-item:not([data-sport])');
+  
+      regularNavItems.forEach(item => {
+        item.addEventListener('click', (e) => {
+          const page = item.getAttribute('data-page');
+          if (page) {
+            e.preventDefault();
+            navigateToPage(page);
+        
+            // Update active state
+            document.querySelectorAll('.nav-item').forEach(nav => {
+              nav.classList.remove('active');
+            });
+            item.classList.add('active');
+          }
+        });
+      });
+
+function switchSportType(sport) {
+  console.log('Switching to sport:', sport);
+  
+  // Hide all sport analysis sections
+  document.querySelectorAll('.sport-analysis-content').forEach(section => {
+    section.style.display = 'none';
+    section.classList.remove('active');
+  });
+  
+  // Show the selected sport section
+  const sportSection = document.getElementById(`analysis-${sport}`);
+  if (sportSection) {
+    sportSection.style.display = 'block';
+    sportSection.classList.add('active');
+  }
+  
+  // Update active state on sport type buttons if they exist
+  document.querySelectorAll('.sport-type-button').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  const activeBtn = document.querySelector(`.sport-type-button[data-sport="${sport}"]`);
+  if (activeBtn) {
+    activeBtn.classList.add('active');
+  }
+  
+  // Update sidebar active state
+  document.querySelectorAll('.nav-item[data-sport]').forEach(nav => {
+    nav.classList.remove('active');
+  });
+  const activeSidebarItem = document.querySelector(`.nav-item[data-sport="${sport}"]`);
+  if (activeSidebarItem) {
+    activeSidebarItem.classList.add('active');
+  }
+}
 
     // Close sidebar on escape key (mobile)
     document.addEventListener('keydown', function(e) {

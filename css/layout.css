@@ -123,3 +123,59 @@ header p {
     font-weight: 600;
     color: var(--text);
 }
+
+
+/* ===== SPORT TYPE ===== */
+/* Add this to your css/components.css or css/layout.css */
+
+.sport-type-nav {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.sport-type-button {
+  padding: 0.75rem 1.5rem;
+  background: var(--surface);
+  color: var(--text);
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: all 0.2s;
+}
+
+.sport-type-button:hover {
+  background: var(--hover);
+  border-color: var(--primary);
+}
+
+.sport-type-button.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.sport-analysis-content {
+  display: none;
+}
+
+.sport-analysis-content.active {
+  display: block;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .sport-type-nav {
+    justify-content: center;
+  }
+  
+  .sport-type-button {
+    flex: 1;
+    min-width: 100px;
+  }
+}

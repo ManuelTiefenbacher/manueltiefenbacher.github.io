@@ -437,6 +437,31 @@ class SettingsManager {
   }
 }
 
+// Save FTP
+document.getElementById('saveFtpBtn')?.addEventListener('click', () => {
+  const ftpInput = document.getElementById('ftpInput');
+  const ftp = parseInt(ftpInput.value);
+  
+  if (ftp && ftp > 0 && ftp < 600) {
+    window.powerAnalyzer.setFTP(ftp);
+    window.storageManager.saveFTP(ftp);
+    window.feedbackManager.showStatus('FTP saved!', true);
+  } else {
+    window.feedbackManager.showStatus('Please enter a valid FTP (50-600W)', false);
+  }
+});
+
+// Scan rides for FTP
+document.getElementById('scanRidesBtn')?.addEventListener('click', () => {
+  const estimatedFTP = window.powerAnalyzer.estimateFTP();
+  if (estimatedFTP) {
+    document.getElementById('estimatedFTP').textContent = `${estimatedFTP}W`;
+    window.feedbackManager.showStatus(`FTP estimated: ${estimatedFTP}W`, true);
+  } else {
+    window.feedbackManager.showStatus('No power data available to estimate FTP', false);
+  }
+});
+
 // Initialize and export singleton
 window.settingsManager = new SettingsManager();
 

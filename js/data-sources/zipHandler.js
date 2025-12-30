@@ -1,9 +1,11 @@
 // js/data-sources/zipHandler.js
-// ZIP file processing for Strava exports
+// ZIP file processing for Strava exports with power data
 
 class ZipHandler {
   constructor() {
     this.csvRuns = [];
+    this.csvRides = [];
+    this.csvSwims = [];
   }
 
   /**
@@ -18,6 +20,8 @@ class ZipHandler {
         
         // Clear old session data
         await window.storageManager.clearRuns();
+        await window.storageManager.clearRides();
+        await window.storageManager.clearSwims();
         window.feedbackManager.hideSessionBanner('zip');
         
         await this.processZipFile(file);
@@ -98,8 +102,53 @@ class ZipHandler {
         complete: (result) => {
           console.log('CSV parsed:', result.data.length, 'rows');
           
+          // Parse runs
           const runs = result.data
             .filter(r => r['Activity Type'] === 'Run')
+            .map(r => ({
+              id: +r['Activity ID'],
+              date: new Date(r['Activity Date']),
+              distance: +r['Distance'] / 1000, // meters to km
+              duration: +r['Moving Time'],
+              avgHR: +r['Average Heart Rate'],
+              maxHR: +r['Max Heart Rate'],
+              filename: r['Filename'],
+              hrStream: null,
+              paceStream: null,
+              source: 'ZIP'
+            }))
+            .filter(r => r.distance && r.duration && !isNaN(r.date.getTime()));
+
+          console.log('Parsed runs:', runs.length);
+          this.csvRuns = runs;
+          window.dataProcessor.addRuns(runs, 'ZIP');
+
+          // Parse rides
+          const rides = result.data
+            .filter(r => r['Activity Type'] === 'Ride' || r['Activity Type'] === 'VirtualRide')
+            .map(r => ({
+              id: +r['Activity ID'],
+              date: new Date(r['Activity Date']),
+              distance: +r['Distance'] / 1000, // meters to km
+              duration: +r['Moving Time'],
+              avgHR: +r['Average Heart Rate'],
+              maxHR: +r['Max Heart Rate'],
+              avgPower: +r['Average Watts'] || null,
+              maxPower: +r['Max Watts'] || null,
+              filename: r['Filename'],
+              hrStream: null,
+              powerStream: null,
+              source: 'ZIP'
+            }))
+            .filter(r => r.distance && r.duration && !isNaN(r.date.getTime()));
+
+          console.log('Parsed rides:', rides.length);
+          this.csvRides = rides;
+          window.dataProcessor.addRides(rides, 'ZIP');
+
+          // Parse swims
+          const swims = result.data
+            .filter(r => r['Activity Type'] === 'Swim')
             .map(r => ({
               id: +r['Activity ID'],
               date: new Date(r['Activity Date']),
@@ -113,18 +162,9 @@ class ZipHandler {
             }))
             .filter(r => r.distance && r.duration && !isNaN(r.date.getTime()));
 
-          console.log('Parsed runs:', runs.length);
-          
-          if (runs.length === 0) {
-            window.feedbackManager.showError('No runs found in CSV. Please check the CSV format.');
-            resolve();
-            return;
-          }
-
-          this.csvRuns = runs;
-          
-          // Add to data processor
-          window.dataProcessor.addRuns(runs, 'ZIP');
+          console.log('Parsed swims:', swims.length);
+          this.csvSwims = swims;
+          window.dataProcessor.addSwims(swims, 'ZIP');
           
           resolve();
         },
@@ -138,7 +178,7 @@ class ZipHandler {
   }
 
   /**
-   * Process TCX files and match with runs
+   * Process TCX files and match with activities
    */
   async processTCXFiles(tcxFiles) {
     let processedCount = 0;
@@ -158,19 +198,53 @@ class ZipHandler {
         // Parse TCX
         const parsedTcx = window.tcxParser.parse(tcxData);
         
-        if (parsedTcx && parsedTcx.hrStream && parsedTcx.hrStream.heartrate.length > 0) {
+        if (parsedTcx) {
           // Extract activity ID from filename
           const activityId = filename.split('/').pop().replace('.tcx.gz', '');
           
-          // Find matching run in data processor
+          // Try to match with run
           const matchingRun = window.dataProcessor.runs.find(r => 
             r.filename && r.filename.includes(activityId)
           );
           
           if (matchingRun) {
             matchedCount++;
-            matchingRun.hrStream = parsedTcx.hrStream;
-            console.log(`✓ Matched ${activityId} (${parsedTcx.hrStream.heartrate.length} HR records)`);
+            if (parsedTcx.hrStream) matchingRun.hrStream = parsedTcx.hrStream;
+            if (parsedTcx.paceStream) matchingRun.paceStream = parsedTcx.paceStream;
+            console.log(`✓ Matched run ${activityId}`);
+          }
+          
+          // Try to match with ride
+          const matchingRide = window.dataProcessor.rides.find(r => 
+            r.filename && r.filename.includes(activityId)
+          );
+          
+          if (matchingRide) {
+            matchedCount++;
+            if (parsedTcx.hrStream) matchingRide.hrStream = parsedTcx.hrStream;
+            if (parsedTcx.powerStream) {
+              matchingRide.powerStream = parsedTcx.powerStream;
+              // Calculate avg/max power from stream if not already set
+              if (!matchingRide.avgPower) {
+                const validWatts = parsedTcx.powerStream.watts.filter(w => w > 0);
+                if (validWatts.length > 0) {
+                  matchingRide.avgPower = validWatts.reduce((a, b) => a + b, 0) / validWatts.length;
+                  matchingRide.maxPower = Math.max(...validWatts);
+                }
+              }
+            }
+            console.log(`✓ Matched ride ${activityId}`);
+          }
+          
+          // Try to match with swim
+          const matchingSwim = window.dataProcessor.swims.find(r => 
+            r.filename && r.filename.includes(activityId)
+          );
+          
+          if (matchingSwim) {
+            matchedCount++;
+            if (parsedTcx.hrStream) matchingSwim.hrStream = parsedTcx.hrStream;
+            console.log(`✓ Matched swim ${activityId}`);
           }
         }
         
@@ -194,9 +268,14 @@ class ZipHandler {
   async finalize() {
     // Save to IndexedDB
     await window.storageManager.saveRuns(window.dataProcessor.runs);
+    await window.storageManager.saveRides(window.dataProcessor.rides);
+    await window.storageManager.saveSwims(window.dataProcessor.swims);
     
     // Show session banner
-    window.feedbackManager.showSessionBanner(window.dataProcessor.runs.length, 'zip');
+    const totalActivities = window.dataProcessor.runs.length + 
+                           window.dataProcessor.rides.length + 
+                           window.dataProcessor.swims.length;
+    window.feedbackManager.showSessionBanner(totalActivities, 'zip');
     
     // Trigger analysis
     if (typeof window.analyze === 'function') {
@@ -216,6 +295,8 @@ class ZipHandler {
     }
     
     await window.storageManager.clearRuns();
+    await window.storageManager.clearRides();
+    await window.storageManager.clearSwims();
     window.dataProcessor.clear();
     window.feedbackManager.hideSessionBanner('zip');
     

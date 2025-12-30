@@ -4,6 +4,7 @@
 class TriRunalyzer {
   constructor() {
     this.initialized = false;
+    this.currentSport = 'run'; // Default to running
   }
 
   /**
@@ -38,18 +39,39 @@ class TriRunalyzer {
       console.log('✓ Loaded saved HR Max:', savedHRMax);
     }
 
-    // Try to load saved run data
+    // Load saved FTP
+    const savedFTP = window.storageManager.loadFTP();
+    if (savedFTP) {
+      window.powerAnalyzer.setFTP(savedFTP);
+      console.log('✓ Loaded saved FTP:', savedFTP);
+    }
+
+    // Try to load saved activity data
     const savedRuns = await window.storageManager.loadRuns();
+    const savedRides = await window.storageManager.loadRides();
+    const savedSwims = await window.storageManager.loadSwims();
+    
     if (savedRuns && savedRuns.length > 0) {
       window.dataProcessor.addRuns(savedRuns, 'Cached');
-      window.feedbackManager.showSessionBanner(savedRuns.length, 'zip');
-      
-      // Trigger analysis with cached data
+    }
+    if (savedRides && savedRides.length > 0) {
+      window.dataProcessor.addRides(savedRides, 'Cached');
+    }
+    if (savedSwims && savedSwims.length > 0) {
+      window.dataProcessor.addSwims(savedSwims, 'Cached');
+    }
+
+    const totalActivities = (savedRuns?.length || 0) + 
+                           (savedRides?.length || 0) + 
+                           (savedSwims?.length || 0);
+    
+    if (totalActivities > 0) {
+      window.feedbackManager.showSessionBanner(totalActivities, 'zip');
       this.analyze();
     }
 
-    // Setup tab navigation
-    this.setupTabs();
+    // Setup navigation
+    this.setupNavigation();
 
     // Setup clear buttons
     this.setupClearButtons();
@@ -59,49 +81,80 @@ class TriRunalyzer {
   }
 
   /**
-   * Setup tab navigation
+   * Setup navigation
    */
-  setupTabs() {
-    // Restore last active tab
-    const savedTab = localStorage.getItem('currentTab');
-    if (savedTab && ['upload', 'settings', 'analysis'].includes(savedTab)) {
-      this.switchTab(savedTab);
+  setupNavigation() {
+    // Page navigation
+    document.querySelectorAll('.nav-item[data-page]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const page = btn.dataset.page;
+        const sport = btn.dataset.sport;
+        
+        if (sport) {
+          this.currentSport = sport;
+          this.switchSport(sport);
+        }
+        
+        this.navigateToPage(page);
+      });
+    });
+
+    // Restore last active page
+    const savedPage = localStorage.getItem('currentPage');
+    if (savedPage) {
+      this.navigateToPage(savedPage);
     }
   }
 
   /**
-   * Switch between tabs
+   * Navigate to a specific page
    */
-  switchTab(tabName) {
-    // Hide all tabs
-    document.querySelectorAll('.tab-content').forEach(tab => {
-      tab.classList.remove('active');
+  navigateToPage(pageId) {
+    // Hide all pages
+    document.querySelectorAll('.content-page').forEach(page => {
+      page.classList.remove('active');
     });
-    
-    // Remove active class from all buttons
-    document.querySelectorAll('.tab-button').forEach(btn => {
-      btn.classList.remove('active');
-    });
-    
-    // Show selected tab
-    const tabContent = document.getElementById('tab-' + tabName);
-    if (tabContent) {
-      tabContent.classList.add('active');
+
+    // Show target page
+    const targetPage = document.getElementById(pageId);
+    if (targetPage) {
+      targetPage.classList.add('active');
     }
-    
-    // Activate corresponding button
-    const buttons = document.querySelectorAll('.tab-button');
-    buttons.forEach(btn => {
-      if (btn.textContent.toLowerCase().includes(tabName)) {
-        btn.classList.add('active');
+
+    // Update nav item states
+    document.querySelectorAll('.nav-item').forEach(item => {
+      item.classList.remove('active');
+      if (item.dataset.page === pageId) {
+        item.classList.add('active');
       }
     });
-    
-    // Save current tab
-    localStorage.setItem('currentTab', tabName);
-    
+
+    // Save current page
+    localStorage.setItem('currentPage', pageId);
+
     // Scroll to top
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  /**
+   * Switch sport type in analysis view
+   */
+  switchSport(sport) {
+    this.currentSport = sport;
+
+    // Hide all sport analysis sections
+    document.querySelectorAll('.sport-analysis-content').forEach(section => {
+      section.style.display = 'none';
+    });
+
+    // Show selected sport
+    const targetSection = document.getElementById(`analysis-${sport}`);
+    if (targetSection) {
+      targetSection.style.display = 'block';
+    }
+
+    // Re-run analysis for the selected sport
+    this.analyze(sport);
   }
 
   /**
@@ -113,6 +166,8 @@ class TriRunalyzer {
     if (clearZipBtn) {
       clearZipBtn.addEventListener('click', async () => {
         await window.storageManager.clearRuns();
+        await window.storageManager.clearRides();
+        await window.storageManager.clearSwims();
         window.dataProcessor.clear();
         window.feedbackManager.hideSessionBanner('zip');
         location.reload();
@@ -124,6 +179,8 @@ class TriRunalyzer {
     if (clearStravaBtn) {
       clearStravaBtn.addEventListener('click', async () => {
         await window.storageManager.clearRuns();
+        await window.storageManager.clearRides();
+        await window.storageManager.clearSwims();
         window.storageManager.clearStravaToken();
         window.dataProcessor.clear();
         window.feedbackManager.hideSessionBanner('strava');
@@ -135,7 +192,31 @@ class TriRunalyzer {
   /**
    * Main analysis function - called after data is loaded
    */
-  analyze() {
+  analyze(sport = null) {
+    const targetSport = sport || this.currentSport;
+
+    console.log(`📊 Analyzing ${targetSport} data...`);
+
+    try {
+      if (targetSport === 'run') {
+        this.analyzeRuns();
+      } else if (targetSport === 'ride') {
+        this.analyzeRides();
+      } else if (targetSport === 'swim') {
+        this.analyzeSwims();
+      }
+
+      console.log(`✅ ${targetSport} analysis complete`);
+    } catch (err) {
+      console.error(`${targetSport} analysis error:`, err);
+      window.feedbackManager.showError(`Error during ${targetSport} analysis`, err);
+    }
+  }
+
+  /**
+   * Analyze runs
+   */
+  analyzeRuns() {
     const runs = window.dataProcessor.runs;
     
     if (runs.length === 0) {
@@ -143,55 +224,98 @@ class TriRunalyzer {
       return;
     }
 
-    console.log(`📊 Analyzing ${runs.length} runs...`);
-
-    try {
-      // Get summary stats
-      const summary = window.dataProcessor.getSummary();
-      console.log('Summary:', summary);
-
-      // Calculate max HR if not set
-      if (window.dataProcessor.hrMax === 190) { // Default value
-        const { maxHR } = window.dataProcessor.calculateMaxHR();
-        if (maxHR > 0) {
-          window.storageManager.saveHRMax(maxHR);
-        }
+    // Calculate max HR if not set
+    if (window.dataProcessor.hrMax === 190) {
+      const { maxHR } = window.dataProcessor.calculateMaxHR();
+      if (maxHR > 0) {
+        window.storageManager.saveHRMax(maxHR);
       }
-
-      // Render all UI components
-      window.uiRenderer.renderBasicInfo(summary);
-      window.uiRenderer.renderCharts(runs);
-      window.uiRenderer.renderTimeline(runs);
-      window.uiRenderer.renderTrainingLoadAnalysis(runs);
-
-      console.log('✅ Analysis complete');
-    } catch (err) {
-      console.error('Analysis error:', err);
-      window.feedbackManager.showError('Error during analysis', err);
     }
+
+    // Get summary and render
+    const summaryRuns = window.dataProcessor.getSummaryRuns();
+    window.uiRenderer.renderBasicInfo(summaryRuns);
+    window.uiRenderer.renderCharts(runs);
+    window.uiRenderer.renderTimeline(runs);
+    window.uiRenderer.renderTrainingLoadAnalysis(runs);
+  }
+
+  /**
+   * Analyze rides
+   */
+  analyzeRides() {
+    const rides = window.dataProcessor.rides;
+    
+    if (rides.length === 0) {
+      console.warn('No rides to analyze');
+      return;
+    }
+
+    // Estimate FTP if not manually set
+    const currentFTP = window.powerAnalyzer.getFTP();
+    if (currentFTP === 200) { // Default value
+      const estimatedFTP = window.powerAnalyzer.estimateFTP();
+      if (estimatedFTP) {
+        window.storageManager.saveFTP(estimatedFTP);
+      }
+    }
+
+    // Render ride-specific UI
+    
+    const summaryRides = window.dataProcessor.getSummaryRides();
+    window.uiRenderer.renderRideBasicInfo(summaryRides);
+    window.uiRenderer.renderRideCharts(rides);
+    window.uiRenderer.renderRideTimeline(rides);
+    window.uiRenderer.renderRideTrainingLoadAnalysis(rides);
+  }
+
+  /**
+   * Analyze swims
+   */
+  analyzeSwims() {
+    const swims = window.dataProcessor.swims;
+    
+    if (swims.length === 0) {
+      console.warn('No swims to analyze');
+      return;
+    }
+
+    // Render swim-specific UI
+       
+    const summarySwims = window.dataProcessor.getSummarySwims();
+    window.uiRenderer.renderSwimBasicInfo(summarySwims);
+    window.uiRenderer.renderSwimCharts(swims);
+    window.uiRenderer.renderSwimTimeline(swims);
+    window.uiRenderer.renderSwimTrainingLoadAnalysis(swims);
   }
 }
 
 // Global function wrappers for compatibility
-window.switchTab = function(tabName) {
-  window.app.switchTab(tabName);
+window.navigateToPage = function(pageId) {
+  window.app.navigateToPage(pageId);
 };
 
-window.analyze = function() {
-  window.app.analyze();
+window.analyze = function(sport = null) {
+  window.app.analyze(sport);
 };
 
 window.clearAndReload = function() {
-  window.storageManager.clearRuns().then(() => location.reload());
+  Promise.all([
+    window.storageManager.clearRuns(),
+    window.storageManager.clearRides(),
+    window.storageManager.clearSwims()
+  ]).then(() => location.reload());
 };
 
 window.clearStravaData = function() {
   window.storageManager.clearRuns();
+  window.storageManager.clearRides();
+  window.storageManager.clearSwims();
   window.storageManager.clearStravaToken();
   location.reload();
 };
 
-// Strava API global functions (for HTML onclick handlers)
+// Strava API global functions
 window.initiateAuth = function() {
   window.stravaAPI.initiateAuth();
 };

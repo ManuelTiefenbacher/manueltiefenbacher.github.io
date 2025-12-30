@@ -1,9 +1,10 @@
 // js/ui/comparison.js
-// Period comparison functionality with equal-length periods
+// Period comparison functionality with equal-length periods and sport type selection
 
 class PeriodComparison {
   constructor() {
     this.comparisonCharts = [];
+    this.currentSport = 'run'; // default sport
   }
 
   /**
@@ -42,9 +43,16 @@ class PeriodComparison {
       
       // Restore previous selections if they exist
       const periodLengthSelect = document.getElementById('periodLengthSelect');
+      const sportTypeSelect = document.getElementById('sportTypeSelect');
       const savedLength = sessionStorage.getItem('comparison_period_length');
+      const savedSport = sessionStorage.getItem('comparison_sport_type');
+      
       if (savedLength && periodLengthSelect) {
         periodLengthSelect.value = savedLength;
+      }
+      if (savedSport && sportTypeSelect) {
+        sportTypeSelect.value = savedSport;
+        this.currentSport = savedSport;
       }
       
       this.updatePeriodOptions(); // Initialize options
@@ -220,12 +228,14 @@ class PeriodComparison {
     const periodLengthSelect = document.getElementById('periodLengthSelect');
     const period1Select = document.getElementById('period1Select');
     const period2Select = document.getElementById('period2Select');
+    const sportTypeSelect = document.getElementById('sportTypeSelect');
 
-    if (!periodLengthSelect || !period1Select || !period2Select) return;
+    if (!periodLengthSelect || !period1Select || !period2Select || !sportTypeSelect) return;
 
     const periodLength = periodLengthSelect.value;
     const period1 = period1Select.value;
     const period2 = period2Select.value;
+    const sportType = sportTypeSelect.value;
 
     if (!period1 || !period2) {
       window.feedbackManager.showError('Please select both periods to compare');
@@ -241,15 +251,21 @@ class PeriodComparison {
     sessionStorage.setItem('comparison_period_length', periodLength);
     sessionStorage.setItem('comparison_period1', period1);
     sessionStorage.setItem('comparison_period2', period2);
+    sessionStorage.setItem('comparison_sport_type', sportType);
+
+    // Update current sport
+    this.currentSport = sportType;
 
     // Close modal
     this.closeComparisonModal();
 
     // Generate comparison
-    this.renderComparison(periodLength, period1, period2);
+    this.renderComparison(periodLength, period1, period2, sportType);
 
-    // Switch to comparison tab
-    window.switchTab('comparison');
+    // Navigate to comparison page
+    if (typeof navigateToPage === 'function') {
+      navigateToPage('page-comparison');
+    }
   }
 
   /**
@@ -295,9 +311,39 @@ class PeriodComparison {
   }
 
   /**
+   * Get activities based on sport type
+   */
+  getActivitiesBySport(sportType) {
+    if (!window.dataProcessor) return [];
+    
+    switch(sportType) {
+      case 'run':
+        return window.dataProcessor.runs || [];
+      case 'ride':
+        return window.dataProcessor.rides || [];
+      case 'swim':
+        return window.dataProcessor.swims || [];
+      default:
+        return window.dataProcessor.runs || [];
+    }
+  }
+
+  /**
+   * Get sport display name
+   */
+  getSportDisplayName(sportType) {
+    const names = {
+      'run': 'Running',
+      'ride': 'Cycling',
+      'swim': 'Swimming'
+    };
+    return names[sportType] || sportType;
+  }
+
+  /**
    * Render comparison between two periods
    */
-  renderComparison(periodLength, period1Value, period2Value) {
+  renderComparison(periodLength, period1Value, period2Value, sportType) {
     const period1Range = this.getPeriodDateRange(period1Value);
     const period2Range = this.getPeriodDateRange(period2Value);
 
@@ -305,8 +351,8 @@ class PeriodComparison {
     const period2Label = document.querySelector(`#period2Select option[value="${period2Value}"]`).textContent;
 
     // Get data for both periods
-    const period1Data = this.getPeriodData(period1Range.startDate, period1Range.endDate);
-    const period2Data = this.getPeriodData(period2Range.startDate, period2Range.endDate);
+    const period1Data = this.getPeriodData(period1Range.startDate, period1Range.endDate, sportType);
+    const period2Data = this.getPeriodData(period2Range.startDate, period2Range.endDate, sportType);
 
     // Clear existing charts
     this.clearComparisonCharts();
@@ -314,53 +360,58 @@ class PeriodComparison {
     // Update title
     const titleEl = document.getElementById('comparisonTitle');
     if (titleEl) {
-      titleEl.textContent = `Comparing: ${period1Label} vs ${period2Label}`;
+      titleEl.textContent = `${this.getSportDisplayName(sportType)}: ${period1Label} vs ${period2Label}`;
     }
 
     // Render comparison stats
-    this.renderComparisonStats(period1Data, period2Data, period1Label, period2Label);
+    this.renderComparisonStats(period1Data, period2Data, period1Label, period2Label, sportType);
 
     // Render comparison charts
-    this.renderComparisonCharts(period1Data, period2Data, period1Label, period2Label);
+    this.renderComparisonCharts(period1Data, period2Data, period1Label, period2Label, sportType);
   }
 
   /**
-   * Get data for a specific date range
+   * Get data for a specific date range and sport type
    */
-  getPeriodData(startDate, endDate) {
-    const runs = window.dataProcessor.runs.filter(r => 
-      r.date >= startDate && r.date <= endDate
+  getPeriodData(startDate, endDate, sportType) {
+    const activities = this.getActivitiesBySport(sportType).filter(a => 
+      a.date >= startDate && a.date <= endDate
     );
     
     // Calculate stats
-    const totalDistance = runs.reduce((sum, r) => sum + r.distance, 0);
-    const totalDuration = runs.reduce((sum, r) => sum + r.duration, 0);
+    const totalDistance = activities.reduce((sum, a) => sum + a.distance, 0);
+    const totalDuration = activities.reduce((sum, a) => sum + a.duration, 0);
     const avgPace = totalDistance > 0 ? totalDuration / totalDistance : 0;
     
     // Get zone distribution
-    const hrDistribution = window.hrAnalyzer.calculateZoneDistribution(runs);
+    const hrDistribution = window.hrAnalyzer ? 
+      window.hrAnalyzer.calculateZoneDistribution(activities) : 
+      { percentages: {} };
     
-    // Classify runs
-    const classifications = window.runClassifier.classifyMultiple(runs);
-    const runTypes = {
-      z2: classifications.filter(c => c.classification.category.includes('Z2')).length,
-      intensity: classifications.filter(c => c.classification.category.includes('Intensity')).length,
-      race: classifications.filter(c => c.classification.category.includes('Race')).length,
-      mixed: classifications.filter(c => c.classification.category.includes('Mixed')).length
-    };
-
-    // Count intervals
-    const intervals = runs.filter(r => window.intervalDetector.detectInterval(r).isInterval).length;
+    // Classify activities (mainly for running)
+    let activityTypes = { z2: 0, intensity: 0, race: 0, mixed: 0 };
+    let intervals = 0;
+    
+    if (sportType === 'run' && window.runClassifier && window.intervalDetector) {
+      const classifications = window.runClassifier.classifyMultiple(activities);
+      activityTypes = {
+        z2: classifications.filter(c => c.classification.category.includes('Z2')).length,
+        intensity: classifications.filter(c => c.classification.category.includes('Intensity')).length,
+        race: classifications.filter(c => c.classification.category.includes('Race')).length,
+        mixed: classifications.filter(c => c.classification.category.includes('Mixed')).length
+      };
+      intervals = activities.filter(a => window.intervalDetector.detectInterval(a).isInterval).length;
+    }
 
     return {
-      runs,
-      totalRuns: runs.length,
+      activities,
+      totalActivities: activities.length,
       totalDistance,
       totalDuration,
-      avgDistance: runs.length > 0 ? totalDistance / runs.length : 0,
+      avgDistance: activities.length > 0 ? totalDistance / activities.length : 0,
       avgPace,
       hrDistribution,
-      runTypes,
+      activityTypes,
       intervals
     };
   }
@@ -368,20 +419,30 @@ class PeriodComparison {
   /**
    * Render comparison statistics
    */
-  renderComparisonStats(data1, data2, label1, label2) {
+  renderComparisonStats(data1, data2, label1, label2, sportType) {
     const container = document.getElementById('comparisonStats');
     if (!container) return;
 
+    const activityLabel = sportType === 'run' ? 'Runs' : 
+                         sportType === 'ride' ? 'Rides' : 
+                         'Swims';
+
     const stats = [
-      { label: 'Total Runs', value1: data1.totalRuns, value2: data2.totalRuns, unit: '' },
+      { label: `Total ${activityLabel}`, value1: data1.totalActivities, value2: data2.totalActivities, unit: '' },
       { label: 'Total Distance', value1: data1.totalDistance.toFixed(1), value2: data2.totalDistance.toFixed(1), unit: 'km' },
-      { label: 'Avg Distance/Run', value1: data1.avgDistance.toFixed(1), value2: data2.avgDistance.toFixed(1), unit: 'km' },
-      { label: 'Avg Pace', value1: this.formatPace(data1.avgPace), value2: this.formatPace(data2.avgPace), unit: '' },
-      { label: 'Z2 Runs', value1: data1.runTypes.z2, value2: data2.runTypes.z2, unit: '' },
-      { label: 'Intensity Runs', value1: data1.runTypes.intensity, value2: data2.runTypes.intensity, unit: '' },
-      { label: 'Race Efforts', value1: data1.runTypes.race, value2: data2.runTypes.race, unit: '' },
-      { label: 'Interval Sessions', value1: data1.intervals, value2: data2.intervals, unit: '' }
+      { label: `Avg Distance/${activityLabel.slice(0, -1)}`, value1: data1.avgDistance.toFixed(1), value2: data2.avgDistance.toFixed(1), unit: 'km' },
+      { label: 'Avg Pace', value1: this.formatPace(data1.avgPace), value2: this.formatPace(data2.avgPace), unit: '' }
     ];
+
+    // Add run-specific stats
+    if (sportType === 'run') {
+      stats.push(
+        { label: 'Z2 Runs', value1: data1.activityTypes.z2, value2: data2.activityTypes.z2, unit: '' },
+        { label: 'Intensity Runs', value1: data1.activityTypes.intensity, value2: data2.activityTypes.intensity, unit: '' },
+        { label: 'Race Efforts', value1: data1.activityTypes.race, value2: data2.activityTypes.race, unit: '' },
+        { label: 'Interval Sessions', value1: data1.intervals, value2: data2.intervals, unit: '' }
+      );
+    }
 
     let html = `
       <div class="comparison-stats-grid">
@@ -414,12 +475,17 @@ class PeriodComparison {
   /**
    * Render comparison charts
    */
-  renderComparisonCharts(data1, data2, label1, label2) {
+  renderComparisonCharts(data1, data2, label1, label2, sportType) {
     // Zone distribution comparison
     this.renderZoneComparisonChart(data1, data2, label1, label2);
     
-    // Run type distribution comparison
-    this.renderRunTypeComparisonChart(data1, data2, label1, label2);
+    // Activity type distribution comparison (mainly for running)
+    if (sportType === 'run') {
+      this.renderRunTypeComparisonChart(data1, data2, label1, label2);
+    } else {
+      // For other sports, show a simple activity count chart
+      this.renderActivityCountChart(data1, data2, label1, label2);
+    }
   }
 
   /**
@@ -503,8 +569,8 @@ class PeriodComparison {
     const ctx = canvas.getContext('2d');
     
     const labels = ['Z2', 'Intensity', 'Race', 'Mixed'];
-    const data1Values = [data1.runTypes.z2, data1.runTypes.intensity, data1.runTypes.race, data1.runTypes.mixed];
-    const data2Values = [data2.runTypes.z2, data2.runTypes.intensity, data2.runTypes.race, data2.runTypes.mixed];
+    const data1Values = [data1.activityTypes.z2, data1.activityTypes.intensity, data1.activityTypes.race, data1.activityTypes.mixed];
+    const data2Values = [data2.activityTypes.z2, data2.activityTypes.intensity, data2.activityTypes.race, data2.activityTypes.mixed];
 
     const chart = new Chart(ctx, {
       type: 'bar',
@@ -549,6 +615,68 @@ class PeriodComparison {
               color: '#9aa0a6',
               stepSize: 1
             },
+            grid: { color: '#2a2f3a' }
+          },
+          x: {
+            ticks: { color: '#9aa0a6' },
+            grid: { color: '#2a2f3a' }
+          }
+        }
+      }
+    });
+
+    this.comparisonCharts.push(chart);
+  }
+
+  /**
+   * Render simple activity count chart
+   */
+  renderActivityCountChart(data1, data2, label1, label2) {
+    const canvas = document.getElementById('runTypeComparisonChart');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    
+    const chart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['Total Activities', 'Total Distance (km)', 'Avg Distance (km)'],
+        datasets: [
+          {
+            label: label1,
+            data: [data1.totalActivities, data1.totalDistance, data1.avgDistance],
+            backgroundColor: 'rgba(52, 168, 83, 0.7)',
+            borderColor: 'rgba(52, 168, 83, 1)',
+            borderWidth: 2
+          },
+          {
+            label: label2,
+            data: [data2.totalActivities, data2.totalDistance, data2.avgDistance],
+            backgroundColor: 'rgba(251, 188, 4, 0.7)',
+            borderColor: 'rgba(251, 188, 4, 1)',
+            borderWidth: 2
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: true,
+            labels: { color: '#ffffff' }
+          },
+          title: {
+            display: true,
+            text: 'Activity Metrics',
+            color: '#ffffff',
+            font: { size: 16 }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { color: '#9aa0a6' },
             grid: { color: '#2a2f3a' }
           },
           x: {

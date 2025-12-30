@@ -158,8 +158,8 @@ class StravaAPI {
     try {
       // Fetch all activities with pagination
       const allActivities = [];
-      const perPage = 200;
-      const maxPages = 2;
+      const perPage = 50;
+      const maxPages = 1;
       
       for (let page = 1; page <= maxPages; page++) {
         window.feedbackManager.showFeedback(
@@ -183,38 +183,39 @@ class StravaAPI {
         if (pageActivities.length < perPage) break;
       }
       
-      // Filter for runs only
+      // Separate by sport type
       const runs = allActivities.filter(a => a.type === 'Run');
+      const rides = allActivities.filter(a => a.type === 'Ride' || a.type === 'VirtualRide');
+      const swims = allActivities.filter(a => a.type === 'Swim');
       
       window.feedbackManager.showFeedback(
-        `⏳ Fetching detailed data for ${runs.length} runs...`, 
+        `⏳ Fetching detailed data for ${runs.length} runs, ${rides.length} rides, ${swims.length} swims...`, 
         'info'
       );
       
-      // Fetch detailed data + HR streams
+      // Fetch detailed data + HR streams for each sport
       const detailedRuns = await this.fetchDetailedData(runs);
+      const detailedRides = await this.fetchDetailedData(rides);
+      const detailedSwims = await this.fetchDetailedData(swims);
       
       // Normalize to our format
-      const normalizedRuns = detailedRuns.map(r => ({
-        id: r.id,
-        date: new Date(r.start_date),
-        distance: r.distance / 1000, // meters to km
-        duration: r.moving_time / 60, // seconds to minutes
-        avgHR: r.average_heartrate || null,
-        maxHR: r.max_heartrate || null,
-        hrStream: r.hrStream || null,
-        paceStream: r.paceStream || null,
-        source: 'Strava API'
-      }));
+      const normalizedRuns = detailedRuns.map(r => this.normalizeActivity(r));
+      const normalizedRides = detailedRides.map(r => this.normalizeActivity(r));
+      const normalizedSwims = detailedSwims.map(r => this.normalizeActivity(r));
 
       // Add to data processor
       window.dataProcessor.addRuns(normalizedRuns, 'Strava');
+      window.dataProcessor.addRides(normalizedRides, 'Strava');
+      window.dataProcessor.addSwims(normalizedSwims, 'Strava');
       
       // Save to storage
       await window.storageManager.saveRuns(window.dataProcessor.runs);
+      await window.storageManager.saveRides(window.dataProcessor.rides);
+      await window.storageManager.saveSwims(window.dataProcessor.swims);
       
       // Show session banner
-      window.feedbackManager.showSessionBanner(normalizedRuns.length, 'strava');
+      const totalActivities = normalizedRuns.length + normalizedRides.length + normalizedSwims.length;
+      window.feedbackManager.showSessionBanner(totalActivities, 'strava');
       
       // Trigger analysis
       if (typeof window.analyze === 'function') {
@@ -223,8 +224,10 @@ class StravaAPI {
       
       const hrCount = normalizedRuns.filter(r => r.hrStream).length;
       const paceCount = normalizedRuns.filter(r => r.paceStream).length;
+      const powerCount = normalizedRides.filter(r => r.powerStream).length;
+      
       window.feedbackManager.showFeedback(
-        `✅ Successfully fetched ${normalizedRuns.length} runs from Strava! (${hrCount} with HR data, ${paceCount} with pace data)`,
+        `✅ Successfully fetched ${normalizedRuns.length} runs (${hrCount} with HR, ${paceCount} with pace), ${normalizedRides.length} rides (${powerCount} with power), ${normalizedSwims.length} swims from Strava!`,
         'success'
       );
       
@@ -232,6 +235,26 @@ class StravaAPI {
       console.error('Strava fetch error:', err);
       window.feedbackManager.showError(`Error fetching Strava data: ${err.message}`);
     }
+  }
+
+  /**
+   * Normalize activity to our format
+   */
+  normalizeActivity(activity) {
+    return {
+      id: activity.id,
+      date: new Date(activity.start_date),
+      distance: activity.distance / 1000, // meters to km
+      duration: activity.moving_time / 60, // seconds to minutes
+      avgHR: activity.average_heartrate || null,
+      maxHR: activity.max_heartrate || null,
+      hrStream: activity.hrStream || null,
+      paceStream: activity.paceStream || null,
+      powerStream: activity.powerStream || null,
+      avgPower: activity.average_watts || null,
+      maxPower: activity.max_watts || null,
+      source: 'Strava API'
+    };
   }
 
   /**
@@ -243,6 +266,7 @@ class StravaAPI {
         // Initialize streams as null
         let hrStream = null;
         let paceStream = null;
+        let powerStream = null;
         
         try {
           // Fetch detailed activity
@@ -253,49 +277,85 @@ class StravaAPI {
           
           if (!detailResponse.ok) {
             console.warn(`Failed to fetch details for activity ${activity.id}`);
-            return { ...activity, hrStream: null, paceStream: null };
+            return { ...activity, hrStream: null, paceStream: null, powerStream: null };
           }
           
           const detailData = await detailResponse.json();
           
-          // Fetch HR and PACE streams
+          // Fetch HR, PACE, and POWER streams WITHOUT key_by_type
           try {
             const streamResponse = await fetch(
-              `https://www.strava.com/api/v3/activities/${activity.id}/streams?keys=heartrate,time,velocity&key_by_type=true`,
+              `https://www.strava.com/api/v3/activities/${activity.id}/streams?keys=heartrate,time,velocity_smooth,watts`,
               { headers: { 'Authorization': `Bearer ${this.accessToken}` } }
             );
             
             if (streamResponse.ok) {
               const streamData = await streamResponse.json();
               
+              console.log(`Activity ${activity.id} streams:`, streamData);
+              
+              // The response is an array of stream objects
+              const hrData = streamData.find(s => s.type === 'heartrate');
+              const timeData = streamData.find(s => s.type === 'time');
+              const velocityData = streamData.find(s => s.type === 'velocity_smooth');
+              const powerData = streamData.find(s => s.type === 'watts');
+              
               // HR Stream
-              if (streamData.heartrate && streamData.time) {
+              if (hrData && hrData.data && timeData && timeData.data) {
                 hrStream = {
-                  heartrate: streamData.heartrate.data,
-                  time: streamData.time.data
+                  heartrate: hrData.data,
+                  time: timeData.data
                 };
+                console.log(`✓ HR stream found for activity ${activity.id}: ${hrData.data.length} points`);
               }
               
               // Pace Stream (convert velocity m/s to min/km)
-              if (streamData.velocity && streamData.time) {
+              if (velocityData && velocityData.data && timeData && timeData.data) {
                 paceStream = {
-                  pace: streamData.velocity.data.map(v => {
+                  pace: velocityData.data.map(v => {
                     // Convert m/s to min/km
-                    // v = m/s, pace = min/km = 1000/(v*60) = 16.667/v
-                    return v > 0 ? 16.667 / v : 0;
+                    // v = m/s, pace = min/km = (1000m / 1km) / (v m/s * 60 s/min) = 1000/(v*60)
+                    if (v === 0 || v === null || v === undefined) return 0;
+                    return 1000 / (v * 60);
                   }),
-                  time: streamData.time.data
+                  time: timeData.data
                 };
+                console.log(`✓ Pace stream found for activity ${activity.id}: ${velocityData.data.length} points`);
+                console.log(`  Sample velocities: ${velocityData.data.slice(0, 5).join(', ')} m/s`);
+                console.log(`  Sample paces: ${paceStream.pace.slice(0, 5).map(p => p.toFixed(2)).join(', ')} min/km`);
+              } else {
+                console.log(`✗ No velocity stream for activity ${activity.id}`);
               }
+              
+              // Power Stream (watts)
+              if (powerData && powerData.data && timeData && timeData.data) {
+                powerStream = {
+                  watts: powerData.data,
+                  time: timeData.data
+                };
+                console.log(`✓ Power stream found for activity ${activity.id}: ${powerData.data.length} points`);
+                console.log(`  Sample power: ${powerData.data.slice(0, 5).join(', ')} watts`);
+                
+                // Calculate average and max power from stream
+                const validWatts = powerData.data.filter(w => w > 0);
+                if (validWatts.length > 0) {
+                  detailData.average_watts = validWatts.reduce((a, b) => a + b, 0) / validWatts.length;
+                  detailData.max_watts = Math.max(...validWatts);
+                }
+              } else {
+                console.log(`✗ No power stream for activity ${activity.id}`);
+              }
+            } else {
+              console.warn(`Stream request failed for activity ${activity.id}: ${streamResponse.status}`);
             }
           } catch (err) {
             console.warn(`Failed to fetch streams for activity ${activity.id}:`, err);
           }
           
-          return { ...detailData, hrStream, paceStream };
+          return { ...detailData, hrStream, paceStream, powerStream };
         } catch (err) {
           console.error(`Error fetching activity ${activity.id}:`, err);
-          return { ...activity, hrStream: null, paceStream: null };
+          return { ...activity, hrStream: null, paceStream: null, powerStream: null };
         }
       })
     );

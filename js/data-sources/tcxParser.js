@@ -1,9 +1,9 @@
 // js/data-sources/tcxParser.js
-// TCX file parsing with interpolation and pace extraction
+// TCX file parsing with interpolation, pace, and power extraction
 
 class TCXParser {
   /**
-   * Parse TCX XML text and extract HR and pace data
+   * Parse TCX XML text and extract HR, pace, and power data
    */
   parse(tcxText) {
     try {
@@ -20,16 +20,30 @@ class TCXParser {
       const trackpoints = doc.getElementsByTagName('Trackpoint');
       const heartrate = [];
       const pace = [];
+      const power = [];
       const time = [];
       let startTime = null;
       let lastPosition = null;
       let lastTime = null;
       
-      // Extract HR, pace and time data
+      // Extract HR, pace, power and time data
       for (let tp of trackpoints) {
         const timeEl = tp.getElementsByTagName('Time')[0];
         const hrEl = tp.getElementsByTagName('Value')[0];
         const positionEl = tp.getElementsByTagName('Position')[0];
+        
+        // Power data (from Extensions)
+        const extensionsEl = tp.getElementsByTagName('Extensions')[0];
+        let powerValue = null;
+        if (extensionsEl) {
+          // Try different power element names (Garmin uses 'Watts' or 'ns3:Watts')
+          const powerEl = extensionsEl.getElementsByTagName('Watts')[0] || 
+                         extensionsEl.getElementsByTagName('ns3:Watts')[0] ||
+                         extensionsEl.getElementsByTagNameNS('*', 'Watts')[0];
+          if (powerEl) {
+            powerValue = parseInt(powerEl.textContent);
+          }
+        }
         
         if (timeEl) {
           const timestamp = new Date(timeEl.textContent);
@@ -53,6 +67,13 @@ class TCXParser {
             }
           } else {
             heartrate.push(null);
+          }
+          
+          // Power value
+          if (powerValue !== null && powerValue >= 0 && powerValue < 2000) {
+            power.push(powerValue);
+          } else {
+            power.push(null);
           }
           
           // Calculate pace from position changes
@@ -111,10 +132,14 @@ class TCXParser {
         this.interpolateValues(pace);
       }
       
+      if (power.length > 0) {
+        this.interpolateValues(power);
+      }
+      
       // Filter out any remaining null values
       const validIndices = [];
       for (let i = 0; i < heartrate.length; i++) {
-        if ((heartrate[i] !== null || pace[i] !== null)) {
+        if ((heartrate[i] !== null || pace[i] !== null || power[i] !== null)) {
           validIndices.push(i);
         }
       }
@@ -140,6 +165,17 @@ class TCXParser {
         result.paceStream = {
           pace: validPace,
           time: validPaceTime
+        };
+      }
+      
+      // Power Stream
+      const validPower = validIndices.map(i => power[i]).filter(w => w !== null && w >= 0);
+      const validPowerTime = validIndices.map(i => time[i]);
+      
+      if (validPower.length > 0) {
+        result.powerStream = {
+          watts: validPower,
+          time: validPowerTime
         };
       }
       

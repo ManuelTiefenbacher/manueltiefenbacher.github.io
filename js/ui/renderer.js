@@ -4,109 +4,191 @@
 class UIRenderer {
   constructor() {
     this.chart = null;
+    this.chartRide = null;
+    this.chartSwim = null;
   }
 
+  /* ---------------- Small UI helpers ---------------- */
+
+  _setText(id, value) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = value ?? '—';
+  }
+
+  _setKm(id, value) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const num = Number(value ?? 0);
+    el.textContent = `${num.toFixed(1)} km`;
+  }
+
+  /* ---------------- Basic info (RUNS) ---------------- */
+
   /**
-   * Render basic info stats
+   * Render basic info stats for RUNS
    */
   renderBasicInfo(summary) {
+    if (!summary || !summary.last6Months || !summary.last7Days) {
+      console.warn('renderBasicInfo: invalid summary object', summary);
+      this._setKm('avgWeekly', 0);
+      this._setKm('distanceWeek', 0);
+      this._setText('runsWeek', 0);
+      this._setText('restDays', '—');
+      const hrMax = window.dataProcessor?.hrMax ?? 0;
+      if (hrMax > 0) this._setText('maxHR', `${hrMax} bpm`);
+      return;
+    }
+
     // Average weekly distance
-    const avgWeekly = summary.last6Months.avgWeekly;
-    document.getElementById('avgWeekly').textContent = `${avgWeekly.toFixed(1)} km`;
+    const avgWeekly = Number(summary.last6Months?.avgWeekly ?? 0);
+    this._setKm('avgWeekly', avgWeekly);
 
     // Last 7 days distance
-    const dist7 = summary.last7Days.distance;
-    document.getElementById('distanceWeek').textContent = `${dist7.toFixed(1)} km`;
+    const dist7 = Number(summary.last7Days?.distance ?? 0);
+    this._setKm('distanceWeek', dist7);
 
     // Runs last week
-    const runsWeek = summary.last7Days.runs;
-    document.getElementById('runsWeek').textContent = runsWeek;
+    const runsWeek = Number(summary.last7Days?.runs ?? 0);
+    this._setText('runsWeek', runsWeek);
 
-    // Days since rest day
-    const daysSinceRest = this.calculateDaysSinceRest();
-    document.getElementById('restDays').textContent = daysSinceRest;
+    // Days since rest day (runs)
+    const daysSinceRest = this.calculateDaysSinceRest('run');
+    this._setText('restDays', daysSinceRest);
 
     // Update HR Max display
-    const hrMax = window.dataProcessor.hrMax;
-    const maxHRElement = document.getElementById('maxHR');
-    if (maxHRElement && hrMax > 0) {
-      maxHRElement.textContent = `${hrMax} bpm`;
-    }
+    const hrMax = window.dataProcessor?.hrMax ?? 0;
+    if (hrMax > 0) this._setText('maxHR', `${hrMax} bpm`);
   }
 
-  /**
-   * Calculate days since last rest day
-   */
-  calculateDaysSinceRest() {
-    const runs = window.dataProcessor.runs;
-    if (runs.length === 0) return 0;
+  /* ---------------- Basic info (RIDES) ---------------- */
 
-    const sortedRuns = [...runs].sort((a, b) => b.date - a.date);
-    const mostRecent = sortedRuns[0];
-    const daysSinceLastRun = window.helpers.daysAgo(mostRecent.date);
-
-    if (daysSinceLastRun > 1) {
-      return 0; // No run today
+  renderRideBasicInfo(summary) {
+    if (!summary || !summary.last6Months || !summary.last7Days) {
+      console.warn('renderRideBasicInfo: invalid summary object', summary);
+      this._setKm('avgWeeklyRide', 0);
+      this._setKm('rideDistanceWeek', 0);
+      this._setText('ridesWeek', 0);
+      this._setText('restDaysRide', '—');
+      return;
     }
 
-    // Count consecutive running days
-    let consecutiveDays = 0;
-    for (let i = 0; i < sortedRuns.length - 1; i++) {
-      const current = sortedRuns[i];
-      const next = sortedRuns[i + 1];
-      const daysBetween = window.helpers.daysBetween(next.date, current.date);
+    const avgWeekly = Number(summary.last6Months?.avgWeekly ?? 0);
+    this._setKm('avgWeeklyRide', avgWeekly);
 
-      if (daysBetween > 1) {
+    const dist7 = Number(summary.last7Days?.distance ?? 0);
+    this._setKm('rideDistanceWeek', dist7);
+
+    const ridesWeek = Number(summary.last7Days?.rides ?? 0);
+    this._setText('ridesWeek', ridesWeek);
+
+    const daysSinceRest = this.calculateDaysSinceRest('ride');
+    this._setText('restDaysRide', daysSinceRest);
+  }
+
+  /* ---------------- Basic info (SWIMS) ---------------- */
+
+  renderSwimBasicInfo(summary) {
+    if (!summary || !summary.last6Months || !summary.last7Days) {
+      console.warn('renderSwimBasicInfo: invalid summary object', summary);
+      this._setKm('avgWeeklySwim', 0);
+      this._setKm('swimDistanceWeek', 0);
+      this._setText('swimsWeek', 0);
+      this._setText('restDaysSwim', '—');
+      return;
+    }
+
+    const avgWeekly = Number(summary.last6Months?.avgWeekly ?? 0);
+    this._setKm('avgWeeklySwim', avgWeekly);
+
+    const dist7 = Number(summary.last7Days?.distance ?? 0);
+    this._setKm('swimDistanceWeek', dist7);
+
+    const swimsWeek = Number(summary.last7Days?.swims ?? 0);
+    this._setText('swimsWeek', swimsWeek);
+
+    const daysSinceRest = this.calculateDaysSinceRest('swim');
+    this._setText('restDaysSwim', daysSinceRest);
+  }
+
+  /* ---------------- Rest-day logic ---------------- */
+
+  calculateDaysSinceRest(sport = 'run') {
+    const list =
+      sport === 'ride' ? window.dataProcessor?.rides
+      : sport === 'swim' ? window.dataProcessor?.swims
+      : window.dataProcessor?.runs;
+
+    if (!Array.isArray(list) || list.length === 0) return '—';
+
+    const sorted = [...list].sort((a, b) => b.date - a.date);
+    const mostRecent = sorted[0];
+    const daysSinceLast = window.helpers.daysAgo(mostRecent.date);
+
+    if (daysSinceLast > 1) {
+      return 0;
+    }
+
+    let consecutiveDays = 0;
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const current = sorted[i];
+      const next = sorted[i + 1];
+      const gapDays = window.helpers.daysBetween(next.date, current.date);
+
+      if (gapDays > 1) {
         consecutiveDays = i + 1;
         break;
       }
     }
 
-    return consecutiveDays || sortedRuns.length;
+    return consecutiveDays || sorted.length;
   }
 
-  /**
-   * Render all charts
-   */
-  renderCharts(runs) {
-    const summary = window.dataProcessor.getSummary();
-    this.renderAverageDistanceChart(runs, summary.last6Months.avgWeekly);
-    this.renderIntensityChart(runs);
+  /* ---------------- Charts (generic) ---------------- */
+
+  renderCharts(activities, avgWeekly = null, options = {}) {
+    const sport = options.sport || 'run';
+
+    if (avgWeekly === null) {
+      if (sport === 'ride') {
+        const s = window.dataProcessor.getSummaryRides();
+        avgWeekly = s?.last6Months?.avgWeekly ?? 0;
+      } else if (sport === 'swim') {
+        const s = window.dataProcessor.getSummarySwims();
+        avgWeekly = s?.last6Months?.avgWeekly ?? 0;
+      } else {
+        const s = window.dataProcessor.getSummary();
+        avgWeekly = s?.last6Months?.avgWeekly ?? 0;
+      }
+    }
+
+    this.renderAverageDistanceChart(activities || [], Number(avgWeekly), sport);
+    this.renderIntensityChart(activities || [], sport);
   }
 
-  /**
-   * Render average distance chart with zone stacking
-   */
-  renderAverageDistanceChart(runs, avgWeekly) {
-    // Get chart range settings
+  renderAverageDistanceChart(activities, avgWeekly, sport = 'run') {
     const chartSettings = window.settingsManager.getChartRanges();
     const monthsToShow = chartSettings.distanceChartMonths;
 
-    // Calculate date range based on settings
     const rangeStart = new Date();
     rangeStart.setMonth(rangeStart.getMonth() - monthsToShow);
 
-    const recentRuns = runs.filter(r => r.date >= rangeStart);
-    const weeklyData = this.calculateWeeklyZoneData(recentRuns);
+    const recent = (activities || []).filter(a => a.date >= rangeStart);
+    const weeklyData = this.calculateWeeklyZoneData(recent);
 
-    // Generate labels
     const labels = weeklyData.map(w => window.helpers.formatDate(w.weekStart));
 
-    // Destroy existing chart
-    if (this.chart) {
-      this.chart.destroy();
+    // Determine which chart instance to use
+    const canvasId = sport === 'ride' ? 'chartRide' : sport === 'swim' ? 'chartSwim' : 'chart';
+    const chartProp = sport === 'ride' ? 'chartRide' : sport === 'swim' ? 'chartSwim' : 'chart';
+
+    if (this[chartProp]) {
+      this[chartProp].destroy();
     }
 
-    const canvas = document.getElementById('chart');
+    const canvas = document.getElementById(canvasId);
     if (!canvas) return;
 
-    // Update chart title
-    const chartTitle = document.querySelector('#tab-analysis .panel h2');
-    if (chartTitle && chartTitle.textContent.includes('Average Weekly Distance')) {
-      chartTitle.textContent = `Average Weekly Distance (Last ${monthsToShow} Month${monthsToShow !== 1 ? 's' : ''})`;
-    }
-
-    // Prepare datasets
     const datasets = [
       {
         label: 'No HR Data',
@@ -168,7 +250,6 @@ class UIRenderer {
         fill: false,
         yAxisID: 'y'
       },
-      // ADD PACE LINE
       {
         type: 'line',
         label: 'Avg Pace (min/km)',
@@ -184,7 +265,7 @@ class UIRenderer {
       }
     ];
 
-    this.chart = new Chart(canvas, {
+    this[chartProp] = new Chart(canvas, {
       type: 'bar',
       data: { labels, datasets },
       options: {
@@ -208,16 +289,14 @@ class UIRenderer {
               label: (context) => {
                 const label = context.dataset.label || '';
                 const value = context.parsed.y;
-            
                 if (value === 0 || value === null) return null;
-            
-                // Format pace specially
+
                 if (label === 'Avg Pace (min/km)') {
                   const minutes = Math.floor(value);
                   const seconds = Math.round((value - minutes) * 60);
                   return `${label}: ${minutes}:${seconds.toString().padStart(2, '0')}/km`;
                 }
-            
+
                 return `${label}: ${value.toFixed(1)} km`;
               },
               footer: (tooltipItems) => {
@@ -268,228 +347,211 @@ class UIRenderer {
     });
   }
 
-  /**
-   * Calculate weekly zone distribution
-   */
-  calculateWeeklyZoneData(runs) {
+  calculateWeeklyZoneData(activities) {
     const weekMap = new Map();
 
-    runs.forEach(run => {
-      const weekStart = window.helpers.getWeekStart(run.date);
+    (activities || []).forEach(activity => {
+      const weekStart = window.helpers.getWeekStart(activity.date);
       const weekKey = weekStart.toISOString().split('T')[0];
-  
+
       if (!weekMap.has(weekKey)) {
         weekMap.set(weekKey, {
           weekStart,
           total: 0,
           z1: 0, z2: 0, z3: 0, z4: 0, z5: 0, z6: 0,
           noHR: 0,
-          paces: [], // Track all paces for averaging
+          paces: [],
           totalDuration: 0
         });
       }
-  
+
       const weekData = weekMap.get(weekKey);
-      weekData.total += run.distance;
-      weekData.totalDuration += run.duration;
-  
-      // Track pace
-      const avgPace = window.intervalDetector.calculateAveragePace(run);
+      weekData.total += (activity.distance || 0);
+      weekData.totalDuration += (activity.duration || 0);
+
+      const avgPace = window.intervalDetector.calculateAveragePace(activity);
       if (avgPace) {
         weekData.paces.push(avgPace);
       }
-  
-      const hrDataType = window.hrAnalyzer.getHRDataType(run);
-  
+
+      const hrDataType = window.hrAnalyzer.getHRDataType(activity);
+
       if (hrDataType === 'none') {
-        weekData.noHR += run.distance;
+        weekData.noHR += (activity.distance || 0);
       } else if (hrDataType === 'detailed') {
-        const analysis = window.hrAnalyzer.analyzeHRStream(run.hrStream);
+        const analysis = window.hrAnalyzer.analyzeHRStream(activity.hrStream);
         if (analysis) {
-          weekData.z1 += run.distance * (analysis.percentZ1 / 100);
-          weekData.z2 += run.distance * (analysis.percentZ2 / 100);
-          weekData.z3 += run.distance * (analysis.percentZ3 / 100);
-          weekData.z4 += run.distance * (analysis.percentZ4 / 100);
-          weekData.z5 += run.distance * (analysis.percentZ5 / 100);
-          weekData.z6 += run.distance * (analysis.percentZ6 / 100);
+          weekData.z1 += (activity.distance || 0) * (analysis.percentZ1 / 100);
+          weekData.z2 += (activity.distance || 0) * (analysis.percentZ2 / 100);
+          weekData.z3 += (activity.distance || 0) * (analysis.percentZ3 / 100);
+          weekData.z4 += (activity.distance || 0) * (analysis.percentZ4 / 100);
+          weekData.z5 += (activity.distance || 0) * (analysis.percentZ5 / 100);
+          weekData.z6 += (activity.distance || 0) * (analysis.percentZ6 / 100);
         }
-      } else { // basic HR
-        const zone = window.hrAnalyzer.getZone(run.avgHR);
+      } else {
+        const zone = window.hrAnalyzer.getZone(activity.avgHR);
         const zoneKey = `z${zone}`;
-        weekData[zoneKey] += run.distance;
+        weekData[zoneKey] += (activity.distance || 0);
       }
     });
 
-    // Calculate average pace per week
     const result = Array.from(weekMap.values()).map(week => ({
       ...week,
-      avgPace: week.paces.length > 0 
-        ? week.paces.reduce((sum, p) => sum + p, 0) / week.paces.length 
+      avgPace: week.paces.length > 0
+        ? week.paces.reduce((sum, p) => sum + p, 0) / week.paces.length
         : null
     }));
 
     return result.sort((a, b) => a.weekStart - b.weekStart);
   }
 
-  /**
-   * Render intensity doughnut chart
-   */
-  renderIntensityChart(runs) {
-      const canvas = document.getElementById('intensityChart');
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      const existing = Chart.getChart(canvas);
-      if (existing) existing.destroy();
-  
-      // Get chart range settings
-      const chartSettings = window.settingsManager.getChartRanges();
-      const weeksToShow = chartSettings.intensityChartWeeks;
-      const daysToShow = weeksToShow * 7;
-      const runsInRange = window.dataProcessor.getRunsInRange(daysToShow);
-      const distribution = window.hrAnalyzer.calculateZoneDistribution(runsInRange);
-  
-      // Update chart title
-      const chartTitle = document.querySelector('#intensityChart').closest('.panel').querySelector('h2');
-      if (chartTitle) {
-        chartTitle.textContent = `Intensity (Last ${weeksToShow} Week${weeksToShow !== 1 ? 's' : ''})`;
-      }
-  
-      if (distribution.totalDataPoints === 0) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.font = '16px system-ui';
-        ctx.fillStyle = '#9aa0a6';
-        ctx.textAlign = 'center';
-        ctx.fillText(`No detailed HR data available for the last ${weeksToShow} week${weeksToShow !== 1 ? 's' : ''}`, canvas.width / 2, canvas.height / 2);
-        return;
-      }
-  
-      const zones = ['z1', 'z2', 'z3', 'z4', 'z5', 'z6'];
-      const labels = zones.map((_, i) => window.hrAnalyzer.getZoneLabel(i + 1));
-      const data = zones.map(z => distribution.percentages[z]);
-      const distances = zones.map(z => distribution.distances[z]);
-      const colors = [
-        'rgba(189, 189, 189, 0.8)',
-        'rgba(66, 133, 244, 0.8)',
-        'rgba(52, 168, 83, 0.8)',
-        'rgba(255, 153, 0, 0.8)',
-        'rgba(234, 67, 53, 0.8)',
-        'rgba(156, 39, 176, 0.8)'
-      ];
-  
-      // Get CSS variable for text color
-      const textColor = getComputedStyle(document.documentElement)
-        .getPropertyValue('--text').trim() || '#e8eaed';
-  
-      // Determine legend position based on screen size
-      const isSmallScreen = window.innerWidth < 768;
-  
-      new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-          labels,
-          datasets: [{
-            data,
-            backgroundColor: colors,
-            borderWidth: 2,
-            borderColor: '#202124'
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: true,
-          cutout: '50%',
-          layout: {
-            padding: {
-              top: 10,
-              bottom: 10,
-              left: 10,
-              right: 10
-            }
-          },
-          plugins: {
-            legend: {
-              display: true,
-              position: isSmallScreen ? 'bottom' : 'right',
-              labels: {
-                color: textColor,
-                padding: 12,
-                font: { 
-                  size: 12,
-                  family: 'system-ui, -apple-system, sans-serif'
-                },
-                usePointStyle: false,
-                boxWidth: 15,
-                boxHeight: 15,
-                generateLabels: (chart) => {
-                  return chart.data.labels.map((label, i) => {
-                    const value = chart.data.datasets[0].data[i];
-                    if (value < 0.1) return null;
-                    const zoneName = label.split(':')[0];
-                    return {
-                      text: `${zoneName}: ${value.toFixed(1)}% | ${distances[i].toFixed(1)} km`,
-                      fillStyle: colors[i],
-                      strokeStyle: colors[i],
-                      fontColor: textColor, // Add this
-                      hidden: false,
-                      index: i
-                    };
-                  }).filter(Boolean);
-                }
-              }
-            },
-            tooltip: {
-              backgroundColor: 'rgba(0, 0, 0, 0.8)',
-              titleColor: textColor,
-              bodyColor: textColor,
-              borderColor: '#444',
-              borderWidth: 1,
-              callbacks: {
-                label: (context) => {
-                  const percent = context.parsed.toFixed(1);
-                  return `Time: ${percent}%`;
-                },
-                afterLabel: (context) => {
-                  const distance = distances[context.dataIndex];
-                  return `Distance: ${distance.toFixed(1)} km`;
-                }
-              }
-            },
-            datalabels: {
-              color: '#ffffff',
-              font: { weight: 'bold', size: 14 },
-              formatter: (value) => value < 2 ? '' : value.toFixed(1) + '%',
-              offset: 0,
-              anchor: 'center',
-              align: 'center'
-            }
-          }
-        },
-        plugins: [ChartDataLabels]
-      });
+  renderIntensityChart(activities, sport = 'run') {
+    const canvasId = sport === 'ride' ? 'intensityChartRide' : sport === 'swim' ? 'intensityChartSwim' : 'intensityChart';
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    const existing = Chart.getChart(canvas);
+    if (existing) existing.destroy();
+
+    const chartSettings = window.settingsManager.getChartRanges();
+    const weeksToShow = chartSettings.intensityChartWeeks;
+    const daysToShow = weeksToShow * 7;
+
+    let inRange = [];
+    if (sport === 'ride') {
+      inRange = window.dataProcessor.getRidesInRange(daysToShow);
+    } else if (sport === 'swim') {
+      inRange = window.dataProcessor.getSwimsInRange(daysToShow);
+    } else {
+      inRange = window.dataProcessor.getRunsInRange(daysToShow);
     }
 
-  /**
-   * Render timeline
-   */
-  renderTimeline(runs) {
-    const div = document.getElementById('timeline');
+    const distribution = window.hrAnalyzer.calculateZoneDistribution(inRange);
+
+    if (distribution.totalDataPoints === 0) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.font = '16px system-ui';
+      ctx.fillStyle = '#9aa0a6';
+      ctx.textAlign = 'center';
+      ctx.fillText(`No detailed HR data available for the last ${weeksToShow} week${weeksToShow !== 1 ? 's' : ''}`, canvas.width / 2, canvas.height / 2);
+      return;
+    }
+
+    const zones = ['z1', 'z2', 'z3', 'z4', 'z5', 'z6'];
+    const labels = zones.map((_, i) => window.hrAnalyzer.getZoneLabel(i + 1));
+    const data = zones.map(z => distribution.percentages[z]);
+    const distances = zones.map(z => distribution.distances[z]);
+    const colors = [
+      'rgba(189, 189, 189, 0.8)',
+      'rgba(66, 133, 244, 0.8)',
+      'rgba(52, 168, 83, 0.8)',
+      'rgba(255, 153, 0, 0.8)',
+      'rgba(234, 67, 53, 0.8)',
+      'rgba(156, 39, 176, 0.8)'
+    ];
+
+    const textColor = getComputedStyle(document.documentElement)
+      .getPropertyValue('--text').trim() || '#e8eaed';
+
+    const isSmallScreen = window.innerWidth < 768;
+
+    new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels,
+        datasets: [{
+          data,
+          backgroundColor: colors,
+          borderWidth: 2,
+          borderColor: '#202124'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        cutout: '50%',
+        layout: {
+          padding: { top: 10, bottom: 10, left: 10, right: 10 }
+        },
+        plugins: {
+          legend: {
+            display: true,
+            position: isSmallScreen ? 'bottom' : 'right',
+            labels: {
+              color: textColor,
+              padding: 12,
+              font: { size: 12, family: 'system-ui, -apple-system, sans-serif' },
+              usePointStyle: false,
+              boxWidth: 15,
+              boxHeight: 15,
+              generateLabels: (chart) => {
+                return chart.data.labels.map((label, i) => {
+                  const value = chart.data.datasets[0].data[i];
+                  if (value < 0.1) return null;
+                  const zoneName = label.split(':')[0];
+                  return {
+                    text: `${zoneName}: ${value.toFixed(1)}% | ${distances[i].toFixed(1)} km`,
+                    fillStyle: colors[i],
+                    strokeStyle: colors[i],
+                    fontColor: textColor,
+                    hidden: false,
+                    index: i
+                  };
+                }).filter(Boolean);
+              }
+            }
+          },
+          tooltip: {
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            titleColor: textColor,
+            bodyColor: textColor,
+            borderColor: '#444',
+            borderWidth: 1,
+            callbacks: {
+              label: (context) => {
+                const percent = context.parsed.toFixed(1);
+                return `Time: ${percent}%`;
+              },
+              afterLabel: (context) => {
+                const distance = distances[context.dataIndex];
+                return `Distance: ${distance.toFixed(1)} km`;
+              }
+            }
+          },
+          datalabels: {
+            color: '#ffffff',
+            font: { weight: 'bold', size: 14 },
+            formatter: (value) => value < 2 ? '' : value.toFixed(1) + '%',
+            offset: 0,
+            anchor: 'center',
+            align: 'center'
+          }
+        }
+      },
+      plugins: [ChartDataLabels]
+    });
+  }
+
+  /* ---------------- Timeline (generic) ---------------- */
+
+  renderTimeline(activities, sport = 'run') {
+    const divId = sport === 'ride' ? 'timelineRide' : sport === 'swim' ? 'timelineSwim' : 'timeline';
+    const div = document.getElementById(divId);
     if (!div) return;
 
     div.innerHTML = '';
 
-    const recentRuns = runs.filter(r => window.helpers.daysAgo(r.date) <= 28);
-    const sortedRuns = [...recentRuns].sort((a, b) => b.date - a.date);
+    const recent = (activities || []).filter(a => window.helpers.daysAgo(a.date) <= 28);
+    const sorted = [...recent].sort((a, b) => b.date - a.date);
 
-    sortedRuns.forEach(run => {
-      const classification = window.runClassifier.classify(run);
-      const el = this.createRunElement(run, classification);
+    sorted.forEach(activity => {
+      const classification = window.runClassifier.classify(activity);
+      const el = this.createRunElement(activity, classification);
       div.appendChild(el);
     });
   }
 
-  /**
-   * Create run element for timeline
-   */
   createRunElement(run, classification) {
     const { category, isLong, hrDataType, detailedHR } = classification;
     const cssClass = window.runClassifier.getCategoryClass(category);
@@ -497,16 +559,11 @@ class UIRenderer {
     const el = document.createElement('div');
     el.className = `run ${cssClass}`;
 
-    // Detect intervals
     const intervalInfo = window.intervalDetector.detectInterval(run);
-
-    // Create tooltip
     const tooltip = this.createRunTooltip(run, classification, intervalInfo);
 
-    // Create badges
     let badges = '';
 
-    // Interval badge (PRIORITY - show first if detected)
     if (intervalInfo.isInterval) {
       badges += '<span class="badge interval-badge">⚡ Interval</span>';
     }
@@ -522,23 +579,18 @@ class UIRenderer {
 
     el.innerHTML = `
       <span>${window.helpers.formatDateFull(run.date)} — ${category}${isLong ? ' (Long)' : ''}</span>
-      <span>${badges}<span class="badge">${run.distance.toFixed(1)} km</span></span>
+      <span>${badges}<span class="badge">${(run.distance ?? 0).toFixed(1)} km</span></span>
       ${tooltip}
     `;
 
     return el;
   }
 
-  /**
-   * Create tooltip for run
-   */
   createRunTooltip(run, classification, intervalInfo) {
     const { category, hrDataType, detailedHR } = classification;
-    const zones = window.dataProcessor.getZonesBPM();
 
     let html = '<div class="tooltip">';
 
-    // Basic info
     html += `
       <div class="tooltip-row">
         <span class="tooltip-label">Type:</span>
@@ -546,11 +598,10 @@ class UIRenderer {
       </div>
       <div class="tooltip-row">
         <span class="tooltip-label">Distance:</span>
-        <span class="tooltip-value">${run.distance.toFixed(2)} km</span>
+        <span class="tooltip-value">${(run.distance ?? 0).toFixed(2)} km</span>
       </div>
     `;
 
-    // Interval information
     if (intervalInfo && intervalInfo.isInterval) {
       html += `
         <div class="tooltip-row" style="background: rgba(251, 188, 4, 0.1); padding: 4px; border-radius: 4px; margin: 8px 0;">
@@ -560,7 +611,6 @@ class UIRenderer {
       `;
     }
 
-    // Average pace
     const avgPace = window.intervalDetector.calculateAveragePace(run);
     if (avgPace) {
       html += `
@@ -571,7 +621,6 @@ class UIRenderer {
       `;
     }
 
-    // HR data info
     if (hrDataType === 'none') {
       html += `
         <div class="tooltip-row">
@@ -592,11 +641,9 @@ class UIRenderer {
         </div>
       `;
     } else if (hrDataType === 'detailed' && detailedHR) {
-      // Add HR graph
       html += '<hr style="border:none;border-top:1px solid var(--border);margin:8px 0">';
       html += window.hrAnalyzer.generateHRGraph(detailedHR.hrRecords);
-  
-      // Zone distribution
+
       html += `
         <div class="tooltip-row">
           <span class="tooltip-label">Time in Z1:</span>
@@ -629,46 +676,78 @@ class UIRenderer {
     return html;
   }
 
-  /**
-   * Render training load analysis
-   */
-  renderTrainingLoadAnalysis(runs) {
-  const container = document.getElementById('trainingLoadAnalysis');
-  if (!container) return;
-  const analysis = window.trainingLoadAnalyzer.analyze(runs);
-  
-  const statusIcon = {
-    'green': '🟢',
-    'yellow': '🟡',
-    'red': '🔴'
-  };
-  let html = '<div class="training-analysis">';
-  
-  Object.values(analysis).forEach(item => {
-    // Escape HTML for tooltip and convert newlines to <br>
-    const tooltipHTML = item.tooltip
-      .replace(/\n/g, '<br>')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/&lt;strong&gt;/g, '<strong>')
-      .replace(/&lt;\/strong&gt;/g, '</strong>')
-      .replace(/&lt;br&gt;/g, '<br>');
+  /* ---------------- Training load (generic) ---------------- */
+
+  renderTrainingLoadAnalysis(activities, sport = 'run') {
+    const containerId = sport === 'ride' ? 'trainingLoadAnalysisRide' : sport === 'swim' ? 'trainingLoadAnalysisSwim' : 'trainingLoadAnalysis';
+    const container = document.getElementById(containerId);
+    if (!container) return;
     
-    html += `
-      <div class="analysis-card ${item.status}">
-        <div class="analysis-header">
-          <span class="status-icon">${statusIcon[item.status]}</span>
-          <h3>${item.metric}</h3>
+    const analysis = window.trainingLoadAnalyzer.analyze(activities || []);
+
+    const statusIcon = { 'green': '🟢', 'yellow': '🟡', 'red': '🔴' };
+    let html = '<div class="training-analysis">';
+
+    Object.values(analysis).forEach(item => {
+      const tooltipHTML = item.tooltip
+        .replace(/\n/g, '<br>')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/&lt;strong&gt;/g, '<strong>')
+        .replace(/&lt;\/strong&gt;/g, '</strong>')
+        .replace(/&lt;br&gt;/g, '<br>');
+
+      html += `
+        <div class="analysis-card ${item.status}">
+          <div class="analysis-header">
+            <span class="status-icon">${statusIcon[item.status]}</span>
+            <h3>${item.metric}</h3>
+          </div>
+          <p class="analysis-message">${item.message}</p>
+          <div class="analysis-tooltip">${tooltipHTML}</div>
         </div>
-        <p class="analysis-message">${item.message}</p>
-        <div class="analysis-tooltip">${tooltipHTML}</div>
-      </div>
-    `;
-  });
-  
-  html += '</div>';
-  container.innerHTML = html;
-}
+      `;
+    });
+
+    html += '</div>';
+    container.innerHTML = html;
+  }
+
+  /* ---------------- Sport-specific wrappers ---------------- */
+
+  renderRideCharts(rides, options = {}) {
+    if (!Array.isArray(rides)) rides = [];
+    const s = window.dataProcessor.getSummaryRides();
+    const avgWeekly = Number(s?.last6Months?.avgWeekly ?? 0);
+    this.renderCharts(rides, avgWeekly, { sport: 'ride', ...options });
+  }
+
+  renderRideTimeline(rides, options = {}) {
+    if (!Array.isArray(rides)) rides = [];
+    this.renderTimeline(rides, 'ride');
+  }
+
+  renderRideTrainingLoadAnalysis(rides, options = {}) {
+    if (!Array.isArray(rides)) rides = [];
+    this.renderTrainingLoadAnalysis(rides, 'ride');
+  }
+
+  renderSwimCharts(swims, options = {}) {
+    if (!Array.isArray(swims)) swims = [];
+    const s = window.dataProcessor.getSummarySwims();
+    const avgWeekly = Number(s?.last6Months?.avgWeekly ?? 0);
+    this.renderCharts(swims, avgWeekly, { sport: 'swim', ...options });
+  }
+
+  renderSwimTimeline(swims, options = {}) {
+    if (!Array.isArray(swims)) swims = [];
+    this.renderTimeline(swims, options);
+  }
+
+  renderSwimTrainingLoadAnalysis(swims, options = {}) {
+    if (!Array.isArray(swims)) swims = [];
+    this.renderTrainingLoadAnalysis(swims, options);
+  }
 }
 
 // Initialize and export singleton

@@ -51,7 +51,7 @@ class VisualizationPresets {
    * Create preset selector UI (tab style)
    */
   createPresetSelector() {
-    const analysisTab = document.getElementById('tab-analysis');
+    const analysisTab = document.getElementById('analysis-run');
     if (!analysisTab) return;
 
     const container = document.createElement('div');
@@ -102,10 +102,9 @@ class VisualizationPresets {
 
     });
     
-if (container.lastChild) {
-  container.removeChild(container.lastChild);
-}
-
+    if (container.lastChild) {
+      container.removeChild(container.lastChild);
+    }
   }
 
   /**
@@ -163,7 +162,7 @@ if (container.lastChild) {
    */
   getStatsPanel() {
     // Find the panel containing the overview stats
-    const panels = document.querySelectorAll('#tab-analysis .panel');
+    const panels = document.querySelectorAll('#analysis-run .panel');
     for (let panel of panels) {
       const h2 = panel.querySelector('h2');
       if (h2 && h2.textContent.includes('Overview')) {
@@ -223,12 +222,12 @@ if (container.lastChild) {
 // Initialize and export singleton
 window.visualizationPresets = new VisualizationPresets();
 
-// Auto-initialize when switching to analysis tab
+// Auto-initialize when switching to analysis page
 document.addEventListener('DOMContentLoaded', () => {
   // Wait for the app to be initialized
   setTimeout(() => {
-    const analysisTab = document.getElementById('tab-analysis');
-    if (analysisTab) {
+    const analysisPage = document.getElementById('page-analysis');
+    if (analysisPage) {
       const observer = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
           if (mutation.target.classList.contains('active')) {
@@ -239,13 +238,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       });
 
-      observer.observe(analysisTab, {
+      observer.observe(analysisPage, {
         attributes: true,
         attributeFilter: ['class']
       });
 
-      // Also init if analysis tab is already active
-      if (analysisTab.classList.contains('active')) {
+      // Also init if analysis page is already active
+      if (analysisPage.classList.contains('active')) {
         window.visualizationPresets.init();
       }
     }
