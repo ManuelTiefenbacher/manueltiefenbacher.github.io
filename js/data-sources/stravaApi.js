@@ -182,8 +182,8 @@ class StravaAPI {
         try {
             // Fetch all activities with pagination
             const allActivities = [];
-            const perPage = 10;
-            const maxPages = 1;
+            const perPage = 50;
+            const maxPages = 2;
 
             for (let page = 1; page <= maxPages; page++) {
                 window.feedbackManager.showFeedback(
