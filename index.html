@@ -348,6 +348,8 @@
           <span id="ftpStatus" class="status"></span>
         </div>
 
+        <hr>
+
       <!-- Chart Display Settings -->
       <div class="panel">
         <h2>Chart Display Settings</h2>
@@ -662,6 +664,7 @@
   
   <!-- 3. Data layer -->
   <script src="js/core/dataProcessor.js"></script>
+  <script src="js/data-sources/fitParser.js"></script>
   <script src="js/data-sources/tcxParser.js"></script>
   
   <!-- 4. Analysis layer (depends on dataProcessor) -->
@@ -676,7 +679,9 @@
   <script src="js/data-sources/stravaApi.js"></script>
   
   <!-- 6. UI layer (depends on everything) -->
-  <script src="js/ui/renderer.js"></script>
+  <script src="js/ui/rendererRuns.js"></script>
+  <script src="js/ui/rendererRides.js"></script>
+  <script src="js/ui/rendererSwims.js"></script>
   <script src="js/ui/settings.js"></script>
   <script src="js/ui/comparison.js"></script>
   <script src="js/ui/visualizationPresets.js"></script>
