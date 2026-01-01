@@ -285,3 +285,9 @@
     color: var(--primary);
     margin-left: 10px;
 }
+
+
+.tooltip .tooltip-row .tooltip-value svg {
+  display: block;
+  max-width: 100%;
+}

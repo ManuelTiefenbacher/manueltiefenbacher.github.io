@@ -185,8 +185,6 @@ class DataProcessor {
         this.rides = Array.from(uniqueMap.values()).sort(
             (a, b) => b.date - a.date
         );
-        console.log("dataProcessor");
-        console.log(this.rides);
 
         console.log(
             `📊 Total unique rides: ${this.rides.length} (added ${normalized.length} from ${source})`

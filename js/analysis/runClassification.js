@@ -20,7 +20,7 @@ class RunClassifier {
             avgWeekly = summary.last6Months.avgWeekly;
         }
 
-        const isLong = run.distance > 0.5 * avgWeekly;
+        const isLong = run.distance > 0.5 * avgWeekly && run.distance > 10;
         const hrDataType = this.hrAnalyzer.getHRDataType(run);
 
         // No HR data = Mixed Effort

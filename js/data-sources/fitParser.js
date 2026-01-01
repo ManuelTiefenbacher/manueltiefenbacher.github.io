@@ -1,448 +1,764 @@
-// js/data-sources/fitParser.js
-// FIT file parsing - self-contained, no external dependencies
-// Based on FIT SDK specifications
+/* eslint-disable no-console */
+
+/**
+ * FITParser (browser-friendly, self-contained)
+ * - Decodes FIT header, definitions, and data messages
+ * - Supports FIT v2.0 Developer Data Fields (field_description #206, developer_data_id #207)
+ * - Handles compressed timestamp record headers
+ * - Converts semicircles -> degrees, speed -> km/h, altitude scaling/offset
+ *
+ * References:
+ *  - FIT Protocol (file structure, headers, base types): https://developer.garmin.com/fit/protocol/
+ *  - Developer Data Fields (v2.0, field_description/developer_data_id): https://developer.garmin.com/fit/cookbook/developer-data/
+ *  - Common scales/units (lat/lon, speed mm/s, altitude 0.2 m & offset): https://logiqx.github.io/gps-wizard/formats/fit.html
+ */
 
 class FITParser {
     constructor() {
-        console.log('FIT Parser initialized (self-contained)');
-        
-        // FIT message types we care about
+        console.log("FIT Parser initialized (self-contained)");
+
+        // Global Message Numbers (GMN) used here (subset of the FIT Profile)
         this.MESSAGE_TYPES = {
             FILE_ID: 0,
             SESSION: 18,
             LAP: 19,
             RECORD: 20,
             EVENT: 21,
-            DEVICE_INFO: 23
+            DEVICE_INFO: 23,
+            FIELD_DESCRIPTION: 206, // FIT v2.0 (developer data)
+            DEVELOPER_DATA_ID: 207, // FIT v2.0 (developer data)
         };
-        
-        // Field definitions for RECORD messages (the data we want)
+
+        // Common record field IDs (subset) — numbers per FIT profile
         this.RECORD_FIELDS = {
-            253: 'timestamp',
-            0: 'position_lat',
-            1: 'position_long',
-            2: 'altitude',
-            3: 'heart_rate',
-            4: 'cadence',
-            5: 'distance',
-            6: 'speed',
-            7: 'power',
-            13: 'temperature',
-            29: 'accumulated_power',
-            73: 'enhanced_speed',
-            78: 'enhanced_altitude'
+            253: "timestamp",
+            0: "position_lat",
+            1: "position_long",
+            2: "altitude", // 0.2 m steps, offset -500 m
+            3: "heart_rate", // bpm
+            4: "cadence", // rpm
+            5: "distance", // meters * 1e-3 (often cumulative)
+            6: "speed", // mm/s -> m/s -> km/h
+            7: "power", // watts
+            13: "temperature", // °C
+            29: "accumulated_power", // watts-seconds
+            73: "enhanced_speed", // like speed but 32-bit
+            78: "enhanced_altitude", // like altitude but 32-bit (no -500 offset)
         };
-        
-        console.log('FIT field definitions loaded:', Object.keys(this.RECORD_FIELDS).length, 'fields');
+
+        // Developer Field description mapping storage:
+        // key = `${developer_data_index}:${field_definition_number}` => { name, units, baseType }
+        this.devFieldMeta = new Map();
+
+        // Developer ID metadata (optional, not required for decoding values)
+        // key = devIdx -> { developerId, applicationId, manufacturer, applicationVersion }
+        this.devIndexMeta = new Map();
+
+        this.FIT_EPOCH_MS = Date.parse("1989-12-31T00:00:00Z");
     }
 
     /**
-     * Parse FIT file binary data
+     * Public: Parse a FIT ArrayBuffer and return either:
+     *  - { records, streams, meta } on success
+     *  - null on failure
      */
     parse(arrayBuffer) {
         try {
             if (!arrayBuffer || arrayBuffer.byteLength === 0) {
-                console.error('Empty FIT file');
+                console.error("Empty FIT file");
                 return null;
             }
 
-            console.log(`Parsing FIT file (${arrayBuffer.byteLength} bytes)`);
-            
             const view = new DataView(arrayBuffer);
-            
-            // Parse FIT header
             const header = this.parseHeader(view);
-            if (!header) {
-                return null;
-            }
+            if (!header) return null;
 
-            console.log(`FIT header: protocol ${header.protocolVersion}, profile ${header.profileVersion}`);
-
-            // Parse records
-            const records = this.parseRecords(view, header);
-            
+            const { records, meta } = this.parseRecords(view, header);
             if (!records || records.length === 0) {
-                console.warn('No records found in FIT file');
+                console.warn("No RECORD messages found");
                 return null;
             }
 
-            console.log(`Extracted ${records.length} records`);
-            
-            return this.extractStreams(records);
-
+            const streams = this.extractStreams(records);
+            return { records, streams, meta };
         } catch (e) {
-            console.error('FIT parsing failed:', e);
+            console.error("FIT parsing failed:", e);
             return null;
         }
     }
 
     /**
-     * Parse FIT file header
+     * FIT file header (12 or 14 bytes; bytes 8..11 must be ".FIT")
+     * https://developer.garmin.com/fit/protocol/
      */
     parseHeader(view) {
         try {
             const headerSize = view.getUint8(0);
             if (headerSize !== 14 && headerSize !== 12) {
-                console.error('Invalid FIT header size:', headerSize);
+                console.error("Invalid FIT header size:", headerSize);
                 return null;
             }
 
             const protocolVersion = view.getUint8(1);
             const profileVersion = view.getUint16(2, true);
             const dataSize = view.getUint32(4, true);
-            
+
+            // signature ".FIT" at bytes 8..11
             const signature = String.fromCharCode(
                 view.getUint8(8),
                 view.getUint8(9),
                 view.getUint8(10),
                 view.getUint8(11)
             );
-            
-            if (signature !== '.FIT') {
-                console.error('Invalid FIT signature:', signature);
+            if (signature !== ".FIT") {
+                console.error("Invalid FIT signature:", signature);
                 return null;
             }
+
+            // Optional: read header CRC if headerSize == 14 (not strictly needed to decode)
+            // const headerCRC = (headerSize === 14) ? view.getUint16(12, true) : null;
 
             return {
                 headerSize,
                 protocolVersion,
                 profileVersion,
                 dataSize,
-                dataOffset: headerSize
+                dataOffset: headerSize,
+                // headerCRC,
             };
-
         } catch (e) {
-            console.error('Header parsing failed:', e);
+            console.error("Header parsing failed:", e);
             return null;
         }
     }
 
     /**
-     * Parse FIT records (simplified - extracts basic data)
+     * Parse records: definitions + data messages
+     * Includes:
+     *  - Normal vs. compressed timestamp headers
+     *  - Developer data extension (definition flag + devFields)
+     *  - Field Description (#206) and Developer Data ID (#207)
      */
     parseRecords(view, header) {
         const records = [];
+        const meta = { file_id: null, sessions: 0, laps: 0 };
+
         let offset = header.dataOffset;
         const endOffset = header.dataOffset + header.dataSize;
-        
+
+        // Local message definitions: localId (0..15) => { globalMessageNumber, architecture, fields[], devFields[] }
         const localMessageTypes = new Map();
-        
-        try {
-            while (offset < endOffset - 2) {
-                // Bounds check
-                if (offset >= view.byteLength) {
-                    break;
-                }
-                
-                const recordHeader = view.getUint8(offset);
-                offset++;
 
-                // Check if it's a definition or data message
-                const isDefinition = (recordHeader & 0x40) !== 0;
-                const localMessageType = recordHeader & 0x0F;
+        // Timestamp accumulator for compressed timestamp headers
+        let currentTimestamp = null;
 
-                if (isDefinition) {
-                    // Bounds check for definition header
-                    if (offset + 5 > view.byteLength) {
-                        break;
-                    }
-                    
-                    // Definition message - store the field definitions
-                    const reserved = view.getUint8(offset);
-                    const architecture = view.getUint8(offset + 1);
-                    const globalMessageNumber = view.getUint16(offset + 2, architecture === 0);
-                    const numFields = view.getUint8(offset + 4);
-                    
-                    offset += 5;
-                    
-                    const fields = [];
-                    for (let i = 0; i < numFields; i++) {
-                        // Bounds check for field definition
-                        if (offset + 3 > view.byteLength) {
-                            break;
-                        }
-                        
-                        const fieldDef = view.getUint8(offset);
-                        const size = view.getUint8(offset + 1);
-                        const baseType = view.getUint8(offset + 2);
-                        offset += 3;
-                        
-                        fields.push({ fieldDef, size, baseType });
-                    }
-                    
-                    // Debug: log field IDs for RECORD messages
-                    if (globalMessageNumber === 20 && localMessageTypes.size === 0) {
-                        console.log(`RECORD message definition found with ${fields.length} fields:`);
-                        console.log('Field IDs:', fields.map(f => `${f.fieldDef} (${this.RECORD_FIELDS[f.fieldDef] || 'unknown'})`).join(', '));
-                    }
-                    
-                    localMessageTypes.set(localMessageType, {
-                        globalMessageNumber,
-                        architecture,
-                        fields
-                    });
-                    
-                } else {
-                    // Data message
-                    const messageType = localMessageTypes.get(localMessageType);
-                    
-                    if (!messageType) {
-                        // Unknown message type, skip
-                        continue;
-                    }
-                    
-                    // Debug: log message types we're seeing
-                    if (records.length === 0) {
-                        console.log(`First data message: type ${messageType.globalMessageNumber}, ${messageType.fields.length} fields`);
-                    }
-                    
-                    // Only parse RECORD messages (type 20)
-                    if (messageType.globalMessageNumber === 20) {
-                        const record = {};
-                        let isFirstRecord = records.length === 0;
-                        
-                        for (const field of messageType.fields) {
-                            // Bounds check before reading field
-                            if (offset + field.size > view.byteLength) {
-                                console.warn(`Skipping field at offset ${offset}, would exceed bounds`);
-                                break;
-                            }
-                            
-                            const fieldId = field.fieldDef;
-                            const fieldName = this.RECORD_FIELDS[fieldId];
-                            
-                            let value = null;
-                            
-                            // Parse based on base type
-                            const baseType = field.baseType & 0x1F;
-                            
-                            try {
-                                if (baseType === 0x00) { // enum
-                                    value = view.getUint8(offset);
-                                } else if (baseType === 0x01) { // sint8
-                                    value = view.getInt8(offset);
-                                } else if (baseType === 0x02) { // uint8
-                                    value = view.getUint8(offset);
-                                } else if (baseType === 0x83) { // sint16
-                                    value = view.getInt16(offset, messageType.architecture === 0);
-                                } else if (baseType === 0x84) { // uint16
-                                    value = view.getUint16(offset, messageType.architecture === 0);
-                                } else if (baseType === 0x85) { // sint32
-                                    value = view.getInt32(offset, messageType.architecture === 0);
-                                } else if (baseType === 0x86) { // uint32
-                                    value = view.getUint32(offset, messageType.architecture === 0);
-                                } else if (baseType === 0x88) { // float32
-                                    value = view.getFloat32(offset, messageType.architecture === 0);
-                                } else {
-                                    // Unknown type, read as bytes
-                                    value = null;
-                                }
-                                
-                                // Debug: log ALL fields with values in first record
-                                if (isFirstRecord && value !== null && value !== 0xFF && value !== 0xFFFF && value !== 0xFFFFFFFF && value !== 0) {
-                                    console.log(`Field ID ${fieldId} (${fieldName || 'unknown'}): ${value}, baseType: 0x${baseType.toString(16)}, size: ${field.size}`);
-                                }
-                                
-                                // Store field if we know what it is
-                                if (fieldName && value !== null && value !== 0xFF && value !== 0xFFFF && value !== 0xFFFFFFFF) {
-                                    // Convert timestamp
-                                    if (fieldName === 'timestamp') {
-                                        // FIT timestamp is seconds since UTC 00:00 Dec 31 1989
-                                        const fitEpoch = new Date('1989-12-31T00:00:00Z').getTime();
-                                        record[fieldName] = new Date(fitEpoch + value * 1000);
-                                    } else if (fieldName === 'speed' || fieldName === 'enhanced_speed') {
-                                        record.speed = value / 1000 * 3.6; // m/s to km/h
-                                    } else {
-                                        record[fieldName] = value;
-                                    }
-                                }
-                            } catch (e) {
-                                // Skip invalid field
-                            }
-                            
-                            offset += field.size;
-                        }
-                        
-                        if (Object.keys(record).length > 0) {
-                            records.push(record);
-                        }
-                    } else {
-                        // Skip other message types
-                        for (const field of messageType.fields) {
-                            // Bounds check
-                            if (offset + field.size > view.byteLength) {
-                                break;
-                            }
-                            offset += field.size;
-                        }
-                    }
-                }
+        // Helper: read bounded UTF-8 string of given size (stop at first 0x00)
+        const readString = (off, size) => {
+            const bytes = new Uint8Array(view.buffer, off, size);
+            const zero = bytes.indexOf(0);
+            const slice = zero >= 0 ? bytes.slice(0, zero) : bytes;
+            return new TextDecoder("utf-8").decode(slice);
+        };
+
+        // Helper: read a base-type value at offset
+        const readValue = (off, normalizedBaseType, littleEndian) => {
+            switch (normalizedBaseType) {
+                case 0x00:
+                    return view.getUint8(off); // enum (uint8)
+                case 0x01:
+                    return view.getInt8(off); // sint8
+                case 0x02:
+                    return view.getUint8(off); // uint8
+                case 0x03:
+                    return view.getInt16(off, littleEndian); // sint16
+                case 0x04:
+                    return view.getUint16(off, littleEndian); // uint16
+                case 0x05:
+                    return view.getInt32(off, littleEndian); // sint32
+                case 0x06:
+                    return view.getUint32(off, littleEndian); // uint32
+                case 0x07:
+                    /* string handled separately */ return null;
+                case 0x08:
+                    return view.getFloat32(off, littleEndian); // float32
+                case 0x09:
+                    return view.getFloat64(off, littleEndian); // float64
+                case 0x0a:
+                    return view.getUint8(off); // uint8z
+                case 0x0b:
+                    return view.getUint16(off, littleEndian); // uint16z
+                case 0x0c:
+                    return view.getUint32(off, littleEndian); // uint32z
+                case 0x0d:
+                    return view.getUint8(off); // byte
+                case 0x0e:
+                    try {
+                        return view.getBigInt64(off, littleEndian);
+                    } catch {
+                        return null;
+                    } // sint64
+                case 0x0f:
+                    try {
+                        return view.getBigUint64(off, littleEndian);
+                    } catch {
+                        return null;
+                    } // uint64/uint64z
+                default:
+                    return null;
             }
-        } catch (e) {
-            console.warn('Stopped parsing at offset', offset, '- extracted', records.length, 'records');
+        };
+
+        // Conversions
+        const toDateFromFitSeconds = (sec) =>
+            new Date(this.FIT_EPOCH_MS + Number(sec) * 1000);
+        const semicirclesToDegrees = (s) => (Number(s) * 180) / 2147483648; // 2**31
+        const toSpeedKmH = (raw) => Number(raw) * 1e-3 * 3.6; // mm/s -> m/s -> km/h
+        const toAltitudeMeters = (raw, enhanced = false) => {
+            const meters = Number(raw) / 5; // 0.2 m steps
+            return enhanced ? meters : meters - 500;
+        };
+
+        while (offset < endOffset - 2) {
+            // leave last 2 bytes for CRC
+            if (offset >= view.byteLength) break;
+
+            const recordHeader = view.getUint8(offset++);
+
+            const isDefinition = (recordHeader & 0x40) !== 0;
+            const isCompressed = (recordHeader & 0x80) !== 0;
+
+            // --- Compressed timestamp header (bit 7 set)
+            if (isCompressed) {
+                // Bits 5-6: two-bit local message number, bits 0-4: 5-bit time offset (seconds)
+                const localMessageType = (recordHeader >> 5) & 0x03;
+                const timeOffset = recordHeader & 0x1f;
+
+                const messageType = localMessageTypes.get(localMessageType);
+                if (!messageType) {
+                    // No definition available yet — cannot parse; skip
+                    continue;
+                }
+
+                // Advance timestamp by offset (requires a prior explicit timestamp)
+                if (currentTimestamp) {
+                    currentTimestamp = new Date(
+                        currentTimestamp.getTime() + timeOffset * 1000
+                    );
+                }
+
+                // Parse data for this definition (same as the non-compressed data branch below)
+                offset = this._parseDataMessage({
+                    view,
+                    offset,
+                    messageType,
+                    records,
+                    currentTimestamp,
+                    helpers: {
+                        readValue,
+                        readString,
+                        toDateFromFitSeconds,
+                        semicirclesToDegrees,
+                        toSpeedKmH,
+                        toAltitudeMeters,
+                    },
+                    RECORD_FIELDS: this.RECORD_FIELDS,
+                });
+                continue;
+            }
+
+            // --- Definition message
+            if (isDefinition) {
+                // Byte layout:
+                // reserved (1), architecture (1), globalMessageNumber (2, endian per architecture),
+                // numFields (1), then numFields * 3 bytes (fieldDef, size, baseType)
+                if (offset + 5 > view.byteLength) break;
+
+                const reserved = view.getUint8(offset);
+                const architecture = view.getUint8(offset + 1); // 0 = little, 1 = big
+                const littleEndian = architecture === 0;
+                const globalMessageNumber = view.getUint16(
+                    offset + 2,
+                    littleEndian
+                );
+                const numFields = view.getUint8(offset + 4);
+                offset += 5;
+
+                const fields = [];
+                for (let i = 0; i < numFields; i++) {
+                    if (offset + 3 > view.byteLength) break;
+                    const fieldDef = view.getUint8(offset);
+                    const size = view.getUint8(offset + 1);
+                    const baseType = view.getUint8(offset + 2); // unmasked (bit7 marks endian-capable types)
+                    offset += 3;
+                    fields.push({ fieldDef, size, baseType });
+                }
+
+                // FIT v2.0 developer data extension:
+                // If header bit 0x20 set, next byte is num_dev_fields, followed by triples (id, size, devIdx)
+                let devFields = [];
+                if ((recordHeader & 0x20) !== 0) {
+                    if (offset >= view.byteLength) break;
+                    const numDevFields = view.getUint8(offset++);
+                    devFields = [];
+                    for (let i = 0; i < numDevFields; i++) {
+                        if (offset + 3 > view.byteLength) break;
+                        const devId = view.getUint8(offset + 0);
+                        const devSize = view.getUint8(offset + 1);
+                        const devIdx = view.getUint8(offset + 2);
+                        offset += 3;
+                        devFields.push({ devId, devSize, devIdx });
+                    }
+                }
+
+                const localMessageType = recordHeader & 0x0f;
+                localMessageTypes.set(localMessageType, {
+                    globalMessageNumber,
+                    architecture,
+                    fields,
+                    devFields,
+                });
+
+                // Track simple meta counts (optional)
+                if (globalMessageNumber === this.MESSAGE_TYPES.FILE_ID)
+                    meta.file_id = true;
+                if (globalMessageNumber === this.MESSAGE_TYPES.SESSION)
+                    meta.sessions += 1;
+                if (globalMessageNumber === this.MESSAGE_TYPES.LAP)
+                    meta.laps += 1;
+
+                continue;
+            }
+
+            // --- Data message
+            const localMessageType = recordHeader & 0x0f;
+            const messageType = localMessageTypes.get(localMessageType);
+            if (!messageType) {
+                // Unknown local ID — skip
+                continue;
+            }
+
+            // Special handling for field_description (#206) and developer_data_id (#207)
+            if (
+                messageType.globalMessageNumber ===
+                this.MESSAGE_TYPES.FIELD_DESCRIPTION
+            ) {
+                // Typical fields (by ID): developer_data_index, field_definition_number, fit_base_type_id,
+                // field_name (string), units (string). See FIT SDK / FitDataProtocol docs.
+                const desc = {
+                    devIdx: undefined,
+                    fieldDefNum: undefined,
+                    fitBaseType: undefined,
+                    fieldName: "",
+                    units: "",
+                };
+
+                for (const field of messageType.fields) {
+                    if (offset + field.size > view.byteLength) break;
+
+                    const baseTypeRaw = field.baseType;
+                    const normalized = baseTypeRaw & 0x1f;
+                    const littleEndian = messageType.architecture === 0;
+
+                    let value;
+                    if (normalized === 0x07) {
+                        value = readString(offset, field.size);
+                    } else {
+                        value = readValue(offset, normalized, littleEndian);
+                    }
+
+                    // Known field IDs (commonly used in profile implementations)
+                    switch (field.fieldDef) {
+                        case 0:
+                            desc.devIdx = value;
+                            break; // developer_data_index
+                        case 1:
+                            desc.fieldDefNum = value;
+                            break; // field_definition_number
+                        case 2:
+                            desc.fitBaseType = value;
+                            break; // fit_base_type_id
+                        case 3:
+                            desc.fieldName = String(value || "");
+                            break; // field_name
+                        case 8:
+                            desc.units = String(value || "");
+                            break; // units
+                        default:
+                            /* ignore other sub-fields */ break;
+                    }
+
+                    offset += field.size;
+                }
+
+                if (desc.devIdx != null && desc.fieldDefNum != null) {
+                    this.devFieldMeta.set(
+                        `${desc.devIdx}:${desc.fieldDefNum}`,
+                        {
+                            name: desc.fieldName || `dev_${desc.fieldDefNum}`,
+                            units: desc.units || "",
+                            baseType: desc.fitBaseType,
+                        }
+                    );
+                }
+                continue;
+            }
+
+            if (
+                messageType.globalMessageNumber ===
+                this.MESSAGE_TYPES.DEVELOPER_DATA_ID
+            ) {
+                const info = {
+                    devIdx: undefined,
+                    developerId: null,
+                    applicationId: null,
+                    manufacturer: null,
+                    applicationVersion: null,
+                };
+
+                for (const field of messageType.fields) {
+                    if (offset + field.size > view.byteLength) break;
+
+                    const baseTypeRaw = field.baseType;
+                    const normalized = baseTypeRaw & 0x1f;
+                    const littleEndian = messageType.architecture === 0;
+
+                    let value;
+                    if (normalized === 0x07) {
+                        value = readString(offset, field.size);
+                    } else {
+                        value = readValue(offset, normalized, littleEndian);
+                    }
+
+                    // Common IDs seen in libraries:
+                    // 0 developer_id (bytes), 1 application_id (bytes), 2 manufacturer, 3 data_index, 4 application_version
+                    switch (field.fieldDef) {
+                        case 0:
+                            info.developerId = value;
+                            break;
+                        case 1:
+                            info.applicationId = value;
+                            break;
+                        case 2:
+                            info.manufacturer = value;
+                            break;
+                        case 3:
+                            info.devIdx = value;
+                            break; // developer_data_index
+                        case 4:
+                            info.applicationVersion = value;
+                            break;
+                        default:
+                            break;
+                    }
+
+                    offset += field.size;
+                }
+
+                if (info.devIdx != null)
+                    this.devIndexMeta.set(info.devIdx, info);
+                continue;
+            }
+
+            // Regular data messages (record/session/lap/etc.)
+            offset = this._parseDataMessage({
+                view,
+                offset,
+                messageType,
+                records,
+                currentTimestamp,
+                helpers: {
+                    readValue,
+                    readString,
+                    toDateFromFitSeconds,
+                    semicirclesToDegrees,
+                    toSpeedKmH,
+                    toAltitudeMeters,
+                },
+                RECORD_FIELDS: this.RECORD_FIELDS,
+            });
+
+            // Keep last explicit timestamp for compressed headers
+            const last = records.length ? records[records.length - 1] : null;
+            if (last?.timestamp) currentTimestamp = last.timestamp;
         }
-        
-        return records;
+
+        // Optional CRC validation (FIT CRC is 2 bytes at end of file)
+        // const fileCRC = view.getUint16(endOffset, true);
+        // const computedCRC = this._computeFitCRC(view, header.dataOffset, header.dataSize);
+        // if (computedCRC !== fileCRC) console.warn('CRC mismatch:', { computedCRC, fileCRC });
+
+        return { records, meta };
     }
 
     /**
-     * Extract power, HR, and other streams from records
+     * Internal: parse one data message at current offset; returns new offset.
+     * Applies unit conversions & developer field values for RECORD messages.
+     */
+    _parseDataMessage({
+        view,
+        offset,
+        messageType,
+        records,
+        currentTimestamp,
+        helpers,
+        RECORD_FIELDS,
+    }) {
+        const {
+            readValue,
+            readString,
+            toDateFromFitSeconds,
+            semicirclesToDegrees,
+            toSpeedKmH,
+            toAltitudeMeters,
+        } = helpers;
+        const littleEndian = messageType.architecture === 0;
+
+        if (messageType.globalMessageNumber === 20 /* RECORD */) {
+            const record = {};
+
+            for (const field of messageType.fields) {
+                if (offset + field.size > view.byteLength) break;
+
+                const baseTypeRaw = field.baseType;
+                const normalized = baseTypeRaw & 0x1f;
+
+                let value;
+                if (normalized === 0x07) {
+                    value = readString(offset, field.size);
+                } else {
+                    value = readValue(offset, normalized, littleEndian);
+                }
+
+                const fieldId = field.fieldDef;
+                const fieldName = RECORD_FIELDS[fieldId];
+
+                // Filter obvious invalids (FIT invalid placeholders)
+                const invalids = [0xff, 0xffff, 0xffffffff];
+                const isValid =
+                    value != null && !invalids.includes(Number(value));
+
+                if (fieldName && isValid) {
+                    if (fieldName === "timestamp") {
+                        const dt = toDateFromFitSeconds(value);
+                        record.timestamp = dt;
+                    } else if (fieldName === "position_lat") {
+                        record.lat = semicirclesToDegrees(value);
+                    } else if (fieldName === "position_long") {
+                        record.lon = semicirclesToDegrees(value);
+                    } else if (fieldName === "enhanced_speed") {
+                        record.speed = toSpeedKmH(value);
+                    } else if (fieldName === "speed") {
+                        // Keep as fallback if enhanced_speed absent
+                        record.speed ??= toSpeedKmH(value);
+                    } else if (fieldName === "enhanced_altitude") {
+                        record.altitude = toAltitudeMeters(value, true);
+                    } else if (fieldName === "altitude") {
+                        record.altitude ??= toAltitudeMeters(value, false);
+                    } else {
+                        record[fieldName] =
+                            typeof value === "bigint" ? Number(value) : value;
+                    }
+                }
+
+                offset += field.size;
+            }
+
+            // Developer fields (if present in the definition)
+            if (messageType.devFields && messageType.devFields.length) {
+                for (const dev of messageType.devFields) {
+                    if (offset + dev.devSize > view.byteLength) break;
+
+                    let value;
+                    // Read as integer or string; there’s no explicit base type in dev definition,
+                    // but most are small integers or strings. We’ll treat length > 4 as string.
+                    if (dev.devSize === 1) value = view.getUint8(offset);
+                    else if (dev.devSize === 2)
+                        value = view.getUint16(offset, littleEndian);
+                    else if (dev.devSize === 4)
+                        value = view.getUint32(offset, littleEndian);
+                    else value = readString(offset, dev.devSize);
+
+                    offset += dev.devSize;
+
+                    const meta = this.devFieldMeta.get(
+                        `${dev.devIdx}:${dev.devId}`
+                    );
+                    const key = meta?.name || `dev_${dev.devIdx}_${dev.devId}`;
+                    record[key] = value;
+                }
+            }
+
+            // If record has no explicit timestamp, use compressed-header timestamp (if we have it)
+            if (!record.timestamp && currentTimestamp) {
+                record.timestamp = currentTimestamp;
+            }
+
+            if (Object.keys(record).length) records.push(record);
+            return offset;
+        }
+
+        // Non-record messages: fast-forward over bytes (or decode if you need more)
+        for (const field of messageType.fields) {
+            if (offset + field.size > view.byteLength) break;
+            offset += field.size;
+        }
+        // Note: Developer fields may also attach to other messages (session/lap).
+        if (messageType.devFields && messageType.devFields.length) {
+            for (const dev of messageType.devFields) {
+                if (offset + dev.devSize > view.byteLength) break;
+                offset += dev.devSize;
+            }
+        }
+        return offset;
+    }
+
+    /**
+     * Extract streams (HR, power, cadence, speed) with timestamps.
+     * Performs simple interpolation to fill short gaps.
      */
     extractStreams(records) {
         const heartrate = [];
         const power = [];
         const cadence = [];
         const speed = [];
-        const time = [];
-        
-        let startTime = null;
+        const timeSec = [];
 
-        records.forEach((record) => {
-            if (!record.timestamp) {
-                return;
-            }
+        let t0 = null;
 
-            if (!startTime) {
-                startTime = record.timestamp;
-            }
+        for (const r of records) {
+            if (!r.timestamp) continue;
+            if (!t0) t0 = r.timestamp;
+            const dt = Math.floor((r.timestamp - t0) / 1000);
+            timeSec.push(dt);
 
-            const elapsedSeconds = Math.floor((record.timestamp - startTime) / 1000);
-            time.push(elapsedSeconds);
-
-            // Heart Rate
             heartrate.push(
-                record.heart_rate !== undefined && record.heart_rate > 0 && record.heart_rate < 250
-                    ? record.heart_rate
+                r.heart_rate != null && r.heart_rate > 0 && r.heart_rate < 250
+                    ? r.heart_rate
                     : null
             );
-
-            // Power
             power.push(
-                record.power !== undefined && record.power >= 0 && record.power < 2000
-                    ? record.power
+                r.power != null && r.power >= 0 && r.power < 2000
+                    ? r.power
                     : null
             );
-
-            // Cadence
             cadence.push(
-                record.cadence !== undefined && record.cadence >= 0 && record.cadence < 255
-                    ? record.cadence
+                r.cadence != null && r.cadence >= 0 && r.cadence < 255
+                    ? r.cadence
                     : null
             );
-
-            // Speed
-            speed.push(
-                record.speed !== undefined && record.speed >= 0
-                    ? record.speed
-                    : null
-            );
-        });
-
-        if (time.length === 0) {
-            return null;
+            speed.push(r.speed != null && r.speed >= 0 ? r.speed : null);
         }
 
-        // Interpolate missing values
-        this.interpolateValues(heartrate);
-        this.interpolateValues(power);
-        this.interpolateValues(cadence);
-        this.interpolateValues(speed);
+        if (timeSec.length === 0) return null;
+
+        // Interpolate short gaps (linear)
+        const interp = (arr) => {
+            for (let i = 0; i < arr.length; i++) {
+                if (arr[i] === null) {
+                    let p = i - 1;
+                    while (p >= 0 && arr[p] === null) p--;
+                    let n = i + 1;
+                    while (n < arr.length && arr[n] === null) n++;
+                    if (p >= 0 && n < arr.length) {
+                        const step = (arr[n] - arr[p]) / (n - p);
+                        arr[i] = arr[p] + step * (i - p);
+                    } else if (p >= 0) {
+                        arr[i] = arr[p];
+                    } else if (n < arr.length) {
+                        arr[i] = arr[n];
+                    }
+                }
+            }
+        };
+        interp(heartrate);
+        interp(power);
+        interp(cadence);
+        interp(speed);
+
+        const filterValid = (data, time, fn) => {
+            const out = [];
+            const tt = [];
+            data.forEach((v, i) => {
+                if (fn(v)) {
+                    out.push(v);
+                    tt.push(time[i]);
+                }
+            });
+            return { data: out, time: tt };
+        };
 
         const result = {};
 
-        // HR Stream
-        const validHR = this.filterValidData(heartrate, time, (hr) => hr !== null && hr > 0);
-        if (validHR.data.length > 0) {
-            result.hrStream = {
-                heartrate: validHR.data,
-                time: validHR.time,
-            };
-            console.log(`✓ Extracted ${validHR.data.length} HR data points`);
-        }
-
-        // Power Stream
-        const validPower = this.filterValidData(power, time, (w) => w !== null && w >= 0);
-        if (validPower.data.length > 0) {
-            result.powerStream = {
-                watts: validPower.data,
-                time: validPower.time,
-            };
-            
-            const powerValues = validPower.data.filter(w => w > 0);
-            if (powerValues.length > 0) {
-                result.avgPower = Math.round(powerValues.reduce((sum, w) => sum + w, 0) / powerValues.length);
-                result.maxPower = Math.round(Math.max(...powerValues));
-                console.log(`✓ Extracted ${validPower.data.length} power data points (avg: ${result.avgPower}W, max: ${result.maxPower}W)`);
+        const hr = filterValid(heartrate, timeSec, (v) => v != null && v > 0);
+        if (hr.data.length) {
+            result.hrStream = { heartrate: hr.data, time: hr.time };
+            const hrVals = hr.data.filter((x) => x > 0);
+            if (hrVals.length) {
+                result.avgHR = Math.round(
+                    hrVals.reduce((s, x) => s + x, 0) / hrVals.length
+                );
+                result.maxHR = Math.round(Math.max(...hrVals));
             }
         }
 
-        // Cadence Stream
-        const validCadence = this.filterValidData(cadence, time, (c) => c !== null && c > 0);
-        if (validCadence.data.length > 0) {
-            result.cadenceStream = {
-                cadence: validCadence.data,
-                time: validCadence.time,
-            };
-            
-            const cadenceValues = validCadence.data.filter(c => c > 0);
-            if (cadenceValues.length > 0) {
-                result.avgCadence = Math.round(cadenceValues.reduce((sum, c) => sum + c, 0) / cadenceValues.length);
-                console.log(`✓ Extracted ${validCadence.data.length} cadence data points (avg: ${result.avgCadence} rpm)`);
+        const pw = filterValid(power, timeSec, (v) => v != null && v >= 0);
+        if (pw.data.length) {
+            result.powerStream = { watts: pw.data, time: pw.time };
+            const pv = pw.data.filter((x) => x > 0);
+            if (pv.length) {
+                result.avgPower = Math.round(
+                    pv.reduce((s, x) => s + x, 0) / pv.length
+                );
+                result.maxPower = Math.round(Math.max(...pv));
             }
         }
 
-        // Speed Stream
-        const validSpeed = this.filterValidData(speed, time, (s) => s !== null && s >= 0);
-        if (validSpeed.data.length > 0) {
-            result.speedStream = {
-                speed: validSpeed.data,
-                time: validSpeed.time,
-            };
-            console.log(`✓ Extracted ${validSpeed.data.length} speed data points`);
+        const cd = filterValid(cadence, timeSec, (v) => v != null && v > 0);
+        if (cd.data.length) {
+            result.cadenceStream = { cadence: cd.data, time: cd.time };
+            const cv = cd.data.filter((x) => x > 0);
+            if (cv.length)
+                result.avgCadence = Math.round(
+                    cv.reduce((s, x) => s + x, 0) / cv.length
+                );
         }
 
-        return Object.keys(result).length > 0 ? result : null;
+        const sp = filterValid(speed, timeSec, (v) => v != null && v >= 0);
+        if (sp.data.length) {
+            result.speedStream = { speed: sp.data, time: sp.time }; // km/h
+        }
+
+        return Object.keys(result).length ? result : null;
     }
 
-    filterValidData(dataArray, timeArray, validationFn) {
-        const filtered = dataArray
-            .map((value, i) => ({ value, time: timeArray[i] }))
-            .filter(item => validationFn(item.value));
-
-        return {
-            data: filtered.map(item => item.value),
-            time: filtered.map(item => item.time),
-        };
-    }
-
-    interpolateValues(array) {
-        for (let i = 0; i < array.length; i++) {
-            if (array[i] === null) {
-                let prevIndex = i - 1;
-                while (prevIndex >= 0 && array[prevIndex] === null) {
-                    prevIndex--;
-                }
-
-                let nextIndex = i + 1;
-                while (nextIndex < array.length && array[nextIndex] === null) {
-                    nextIndex++;
-                }
-
-                if (prevIndex >= 0 && nextIndex < array.length) {
-                    const prevVal = array[prevIndex];
-                    const nextVal = array[nextIndex];
-                    const steps = nextIndex - prevIndex;
-                    const step = i - prevIndex;
-                    array[i] = prevVal + (nextVal - prevVal) * (step / steps);
-                } else if (prevIndex >= 0) {
-                    array[i] = array[prevIndex];
-                } else if (nextIndex < array.length) {
-                    array[i] = array[nextIndex];
-                }
-            }
-        }
+    /**
+     * (Optional) FIT CRC16 calculation — if you want integrity checks.
+     * FIT uses a table-based CRC; you can implement it here if needed.
+     * For brevity, this is left as a stub.
+     */
+    _computeFitCRC(_view, _start, _length) {
+        // Implement Garmin FIT CRC if you need strict validation.
+        // See SDK Decode.checkIntegrity() for behavior. [2](https://libraries.io/pypi/garmin-fit-sdk)
+        return null;
     }
 }
 
-// Initialize and export singleton
+// Expose as a singleton for quick testing (like your original)
 window.fitParser = new FITParser();
+
+/**
+ * Example usage in the browser:
+ *
+ * <input type="file" id="fitFile" accept=".fit" />
+ * <pre id="out"></pre>
+ *
+ * const input = document.getElementById('fitFile');
+ * const out   = document.getElementById('out');
+ * input.addEventListener('change', async () => {
+ *   const file = input.files?.[0];
+ *   if (!file) return;
+ *   const buf = await file.arrayBuffer();
+ *   const result = window.fitParser.parse(buf);
+ *   out.textContent = JSON.stringify(result?.streams ?? result, null, 2);
+ * });
+ */

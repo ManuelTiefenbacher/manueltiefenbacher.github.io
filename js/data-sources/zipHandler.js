@@ -166,7 +166,7 @@ class ZipHandler {
                         .filter(
                             (r) =>
                                 r["Activity Type"] === "Ride" ||
-                                r["Activity Type"] === "VirtualRide"
+                                r["Activity Type"] === "Virtual Ride"
                         )
                         .map((r) => ({
                             id: +r["Activity ID"],
