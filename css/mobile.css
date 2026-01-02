@@ -11,97 +11,69 @@
         padding: 0;
     }
 
-    /* Header */
-    header { 
-        padding: 10px 16px;
-        position: relative;
-    }
-    
-    header h1 { 
-        font-size: 1.5rem; 
-    }
-    
-    header p { 
-        font-size: 0.85rem; 
+    /* Sidebar - full width on small mobile */
+    .sidebar {
+        width: 100%;
+        transform: translateX(-100%) !important;
     }
 
-    /* Mobile burger menu */
-    .mobile-menu-toggle {
-        display: block;
-        position: absolute;
-        top: 50%;
-        right: 16px;
-        transform: translateY(-50%);
-        background: transparent;
-        border: none;
+    .sidebar.mobile-open {
+        transform: translateX(0) !important;
+    }
+
+    .sidebar.collapsed {
+        transform: translateX(-100%) !important;
+    }
+
+    /* Adjust sidebar header for mobile */
+    .sidebar-header {
+        padding: 16px;
+    }
+
+    .sidebar-logo {
         width: 40px;
         height: 40px;
-        padding: 8px;
-        cursor: pointer;
-        z-index: 1001;
     }
 
-    .mobile-menu-toggle span {
-        display: block;
-        width: 100%;
-        height: 3px;
-        background: var(--text);
-        border-radius: 2px;
-        transition: all 0.3s ease;
-        margin: 5px 0;
+    .sidebar-brand h1 {
+        font-size: 1.1rem;
     }
 
-    .mobile-menu-toggle.active span:nth-child(1) {
-        transform: rotate(45deg) translate(7px, 7px);
+    /* Larger touch targets on mobile */
+    .nav-item {
+        padding: 14px 12px;
+        font-size: 1rem;
+        min-height: 44px;
     }
 
-    .mobile-menu-toggle.active span:nth-child(2) {
-        opacity: 0;
+    .nav-item-icon {
+        font-size: 1.4rem;
+        width: 28px;
     }
 
-    .mobile-menu-toggle.active span:nth-child(3) {
-        transform: rotate(-45deg) translate(7px, -7px);
+    .mobile-sidebar-toggle {
+        bottom: 16px;
+        right: 16px;
+        width: 52px;
+        height: 52px;
     }
 
-    /* Hide desktop navigation */
+    /* Content pages */
+    .content-page {
+        padding: 16px;
+    }
+
+    .page-header {
+        margin-bottom: 24px;
+    }
+
+    .page-header h1 {
+        font-size: 1.5rem;
+    }
+
+    /* Hide desktop navigation (legacy tab system) */
     .tab-nav {
         display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100vh;
-        background: var(--panel);
-        flex-direction: column;
-        padding: 80px 20px 20px;
-        z-index: 1000;
-        overflow-y: auto;
-        gap: 0;
-        border-radius: 0;
-        border-bottom: none;
-        margin-bottom: 0;
-        transform: translateX(-100%);
-        transition: transform 0.3s ease;
-    }
-
-    .tab-nav.mobile-open {
-        display: flex;
-        transform: translateX(0);
-    }
-
-    .tab-button {
-        width: 100%;
-        padding: 1rem 1.5rem;
-        text-align: left;
-        border-radius: 8px;
-        border-bottom: none;
-        margin-bottom: 0.5rem;
-        font-size: 1rem;
-    }
-
-    .tab-button.active {
-        background: var(--primary);
-        color: white;
     }
 
     /* Containers & panels - remove boxes for more space */
@@ -124,26 +96,6 @@
         border-color: var(--border);
     }
 
-    /* Tabs: touch-friendly, scrollable */
-    .tab-nav {
-        gap: 0.25rem;
-        padding: 0.5rem;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
-    }
-    
-    .tab-nav::-webkit-scrollbar { 
-        display: none; 
-    }
-
-    .tab-button {
-        padding: 0.5rem 0.75rem;
-        font-size: 0.85rem;
-        white-space: nowrap;
-        flex-shrink: 0;
-    }
-
     /* Buttons & form inputs: larger tap targets */
     button,
     input[type="text"],
@@ -151,6 +103,7 @@
     select {
         font-size: 14px;
         padding: 10px 14px;
+        min-height: 44px;
     }
     
     button { 
@@ -237,6 +190,11 @@
         grid-template-columns: 1fr;
         gap: 8px;
         padding: 12px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .comparison-row:hover {
+        background: var(--panel-hover);
     }
     
     .stat-label {
@@ -257,6 +215,20 @@
         font-weight: 400;
     }
 
+    /* Comparison stats: remove boxes */
+    .comparison-stats-grid {
+        padding: 0;
+        margin: 0;
+        background: transparent;
+        border-radius: 0;
+    }
+
+    /* Comparison select: stack vertically */
+    .comparison-select-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
     /* Charts: ensure fit */
     canvas,
     #chart {
@@ -268,6 +240,22 @@
     .modal-content {
         width: 95%;
         max-height: 95vh;
+    }
+
+    .modal-header,
+    .modal-body,
+    .modal-footer {
+        padding: 16px;
+    }
+    
+    .modal-header h2 {
+        font-size: 1.25rem;
+    }
+    
+    .close-btn {
+        font-size: 28px;
+        width: 36px;
+        height: 36px;
     }
 
     /* Info box: reduce spacing and remove border radius */
@@ -319,6 +307,7 @@
     .preset-tab {
         padding: 8px 12px;
         font-size: 0.85rem;
+        min-height: 44px;
     }
     
     .preset-tab-icon {
@@ -372,6 +361,7 @@
     .instructions-toggle {
         padding: 0.75rem;
         font-size: 0.95rem;
+        min-height: 44px;
     }
     
     .instructions-content {
@@ -380,6 +370,24 @@
     
     .instructions-container.expanded .instructions-content {
         padding: 0.75rem;
+    }
+
+    .instructions-list {
+        padding: 1rem 16px;
+        margin: 0;
+        border-radius: 0;
+        border-left: none;
+        border-right: none;
+    }
+    
+    .instructions-list ol {
+        margin-left: 1rem;
+        margin-top: 0.75rem;
+    }
+    
+    .instructions-list li {
+        margin: 0.5rem 0;
+        line-height: 1.6;
     }
 
     /* Timeline: remove box */
@@ -471,73 +479,5 @@
     
     .detail-value {
         font-size: 16px;
-    }
-
-    /* Modal adjustments */
-    .modal-header,
-    .modal-body,
-    .modal-footer {
-        padding: 16px;
-    }
-    
-    .modal-header h2 {
-        font-size: 1.25rem;
-    }
-    
-    .close-btn {
-        font-size: 28px;
-        width: 36px;
-        height: 36px;
-    }
-
-    /* Comparison select: stack vertically */
-    .comparison-select-grid {
-        grid-template-columns: 1fr;
-        gap: 1rem;
-    }
-
-    /* Ensure touch-friendly spacing */
-    button,
-    .tab-button,
-    .preset-tab,
-    input,
-    select {
-        min-height: 44px; /* Apple's recommended minimum touch target */
-    }
-
-    /* Comparison stats: remove boxes */
-    .comparison-stats-grid {
-        padding: 0;
-        margin: 0;
-        background: transparent;
-        border-radius: 0;
-    }
-
-    .comparison-row {
-        padding: 16px;
-        border-bottom: 1px solid var(--border);
-    }
-
-    .comparison-row:hover {
-        background: var(--panel-hover);
-    }
-
-    /* Instructions: remove boxes */
-    .instructions-list {
-        padding: 1rem 16px;
-        margin: 0;
-        border-radius: 0;
-        border-left: none;
-        border-right: none;
-    }
-    
-    .instructions-list ol {
-        margin-left: 1rem;
-        margin-top: 0.75rem;
-    }
-    
-    .instructions-list li {
-        margin: 0.5rem 0;
-        line-height: 1.6;
     }
 }
