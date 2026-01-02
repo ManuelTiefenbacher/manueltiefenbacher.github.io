@@ -633,179 +633,6 @@ class RunRenderer {
         return { times: dsTimes, paces: dsPaces };
     }
 
-    /**
-     * Generate an inline SVG sparkline for pace over time from {pace, time}.
-     * - pace: array of pace values (min/km or seconds/km; auto-detected)
-     * - time: array of timestamps (seconds from start OR epoch/ms; we normalize)
-     *
-     * Faster paces are shown lower (inverted Y). X axis spans the run duration.
-     */
-    generatePaceGraphFromStream(paceStream) {
-        const paceArr = Array.isArray(paceStream?.pace)
-            ? paceStream.pace
-            : null;
-        const timeArr = Array.isArray(paceStream?.time)
-            ? paceStream.time
-            : null;
-
-        if (!paceArr || !timeArr || paceArr.length < 3 || timeArr.length < 3) {
-            return `
-              <div class="tooltip-row">
-                <span class="tooltip-label">Pace Stream:</span>
-                <span class="tooltip-value" style="color:#9aa0a6">Not enough data</span>
-              </div>
-            `;
-        }
-
-        const n = Math.min(paceArr.length, timeArr.length);
-        const t0 = Number(timeArr[0]);
-        const stepRaw = Number(timeArr[1]) - Number(timeArr[0]); // detect ms vs s
-        const msLikely = stepRaw > 100; // simple heuristic: >100 implies ms
-
-        // Normalize times to seconds-from-start
-        const times = [];
-        for (let i = 0; i < n; i++) {
-            let t = Number(timeArr[i]) - t0;
-            if (msLikely) t = t / 1000;
-            times.push(t);
-        }
-        const totalT = times[times.length - 1];
-        if (!isFinite(totalT) || totalT <= 0) {
-            return `
-              <div class="tooltip-row">
-                <span class="tooltip-label">Pace Stream:</span>
-                <span class="tooltip-value" style="color:#9aa0a6">Invalid time data</span>
-              </div>
-            `;
-        }
-
-        // Convert pace to min/km and clean
-        const minsKmRaw = paceArr
-            .slice(0, n)
-            .map((v) => this.toMinutesPerKm(v));
-
-        const timesClean = [];
-        const minsKmClean = [];
-        for (let i = 0; i < n; i++) {
-            const v = minsKmRaw[i];
-            const tt = times[i];
-            if (
-                v != null &&
-                isFinite(v) &&
-                tt != null &&
-                isFinite(tt) &&
-                v > 0
-            ) {
-                minsKmClean.push(v);
-                timesClean.push(tt);
-            }
-        }
-        if (minsKmClean.length < 3) {
-            return `
-              <div class="tooltip-row">
-                <span class="tooltip-label">Pace Stream:</span>
-                <span class="tooltip-value" style="color:#9aa0a6">Not enough valid data</span>
-              </div>
-            `;
-        }
-
-        // Optional smoothing
-        const minsKmSmooth = this.smooth(minsKmClean, 5);
-
-        // Downsample to keep SVG light
-        const { times: tDS, paces: pDS } = this.downsamplePairs(
-            timesClean,
-            minsKmSmooth,
-            220
-        );
-
-        // Dimensions
-        const w = 260;
-        const h = 68;
-        const padL = 8,
-            padR = 8,
-            padT = 6,
-            padB = 6;
-
-        // Scales
-        const minPace = Math.min(...pDS);
-        const maxPace = Math.max(...pDS);
-        const spanPace = Math.max(1e-9, maxPace - minPace);
-        const xScale = (tt) => padL + (w - padL - padR) * (tt / totalT);
-        const yScale = (v) => {
-            // invert: faster (smaller min/km) is lower on the chart
-            const t = (v - minPace) / spanPace;
-            return padT + (h - padT - padB) * (1 - t);
-        };
-
-        // Path
-        let d = "";
-        for (let i = 0; i < pDS.length; i++) {
-            const x = xScale(tDS[i]);
-            const y = yScale(pDS[i]);
-            d += i === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`;
-        }
-
-        // Median band
-        const sorted = [...pDS].sort((a, b) => a - b);
-        const median =
-            sorted.length % 2
-                ? sorted[(sorted.length - 1) / 2]
-                : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) /
-                  2;
-
-        const medianY = yScale(median);
-        const bandTop = Math.max(padT, medianY - 2);
-        const bandHeight = Math.max(
-            1,
-            Math.min(h - padB, medianY + 2) - bandTop
-        );
-
-        // Stats
-        const avg = pDS.reduce((acc, v) => acc + v, 0) / pDS.length;
-        const last = pDS[pDS.length - 1];
-        const minStr = this.formatPaceValue(minPace);
-        const maxStr = this.formatPaceValue(maxPace);
-        const avgStr = this.formatPaceValue(avg);
-        const lastStr = this.formatPaceValue(last);
-
-        // Build SVG
-        const svg = `
-          <svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Pace sparkline over time">
-            <rect x="0" y="0" width="${w}" height="${h}" fill="transparent"/>
-            <!-- Median band -->
-            <rect x="${padL}" y="${bandTop}" width="${w - padL - padR}" height="${bandHeight}"
-                  fill="rgba(251, 188, 4, 0.12)"/>
-            <!-- Pace path -->
-            <path d="${d}" fill="none" stroke="rgba(251, 188, 4, 1)" stroke-width="2"/>
-            <!-- Last point -->
-            <circle cx="${xScale(tDS[tDS.length - 1])}" cy="${yScale(last)}" r="2.5" fill="rgba(251, 188, 4, 1)"/>
-          </svg>
-        `;
-
-        // Stats rows
-        const stats = `
-          <div class="tooltip-row" style="margin-top:6px">
-            <span class="tooltip-label">Min / Avg / Max:</span>
-            <span class="tooltip-value">${minStr} • ${avgStr} • ${maxStr}</span>
-          </div>
-          <div class="tooltip-row">
-            <span class="tooltip-label">Last pace:</span>
-            <span class="tooltip-value">${lastStr}</span>
-          </div>
-        `;
-
-        // Container block for the tooltip
-        return `
-          <hr style="border:none;border-top:1px solid var(--border);margin:8px 0">
-          <div class="tooltip-row" style="flex-direction:column;gap:6px">
-            <span class="tooltip-label" style="margin-bottom:2px">Pace over time:</span>
-            <div class="tooltip-value" style="width:100%">${svg}</div>
-          </div>
-          ${stats}
-        `;
-    }
-
     /* ---------------- Tooltip ---------------- */
 
     createRunTooltip(run, classification, intervalInfo) {
@@ -833,25 +660,6 @@ class RunRenderer {
       `;
         }
 
-        const avgPace = window.helpers.calculateAveragePace(run);
-        if (avgPace) {
-            html += `
-        <div class="tooltip-row">
-          <span class="tooltip-label">Avg Pace:</span>
-          <span class="tooltip-value">${window.helpers.formatPace(avgPace)}</span>
-        </div>
-      `;
-        }
-
-        // Pace stream (sparkline) — expects { pace: [], time: [] }
-        if (
-            run.paceStream &&
-            Array.isArray(run.paceStream.pace) &&
-            Array.isArray(run.paceStream.time)
-        ) {
-            html += this.generatePaceGraphFromStream(run.paceStream);
-        }
-
         if (hrDataType === "none") {
             html += `
         <div class="tooltip-row">
@@ -874,7 +682,10 @@ class RunRenderer {
         } else if (hrDataType === "detailed" && detailedHR) {
             html +=
                 '<hr style="border:none;border-top:1px solid var(--border);margin:8px 0">';
-            html += window.hrAnalyzer.generateHRGraph(detailedHR.hrRecords);
+            html += window.hrAnalyzer.generateHRGraph(
+                detailedHR.hrRecords,
+                run.paceStream.pace
+            );
 
             html += `
         <div class="tooltip-row">
