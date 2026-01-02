@@ -258,8 +258,6 @@ class StorageManager {
             }
 
             await txDone(tx);
-            console.log("save");
-            console.log(rides);
             console.log(`✓ ${rides.length} rides saved to IndexedDB`);
             return true;
         } catch (err) {
@@ -282,8 +280,6 @@ class StorageManager {
             (rides || []).forEach((ride) => {
                 if (ride && ride.date) ride.date = reviveDate(ride.date);
             });
-            console.log("load");
-            console.log(rides);
             console.log(
                 `✓ ${(rides || []).length} rides loaded from IndexedDB`
             );

@@ -16,21 +16,6 @@ class VisualizationPresets {
                     "intensityChart",
                 ],
             },
-            training: {
-                name: "Training",
-                icon: "🏃",
-                sections: [
-                    "stats",
-                    "trainingLoad",
-                    "intensityChart",
-                    "timeline",
-                ],
-            },
-            progress: {
-                name: "Progress",
-                icon: "📈",
-                sections: ["stats", "weeklyChart", "timeline"],
-            },
             recovery: {
                 name: "Recovery",
                 icon: "💤",
@@ -40,11 +25,6 @@ class VisualizationPresets {
                 name: "Zones",
                 icon: "❤️",
                 sections: ["intensityChart", "weeklyChart", "timeline"],
-            },
-            quick: {
-                name: "Quick",
-                icon: "⚡",
-                sections: ["stats", "trainingLoad"],
             },
         };
     }

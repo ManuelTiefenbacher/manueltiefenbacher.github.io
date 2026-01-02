@@ -42,6 +42,7 @@ class SettingsManager {
      */
     init() {
         this.setupHRMaxControls();
+        this.setupFtpControls();
         this.setupZoneControls();
         this.setupScanButton();
         this.setupChartRangeControls();
@@ -55,6 +56,7 @@ class SettingsManager {
     loadSavedSettings() {
         const zones = window.dataProcessor.zones;
         const hrMax = window.dataProcessor.hrMax;
+        const ftp = window.dataProcessor.ftp;
 
         // Load zone percentages
         const z2Input = document.getElementById("z2UpperInputPct");
@@ -75,6 +77,12 @@ class SettingsManager {
         const maxHrInput = document.getElementById("maxHrInput");
         if (maxHrInput && hrMax) {
             maxHrInput.value = hrMax;
+        }
+
+        // Load FTP
+        const ftpInput = document.getElementById("ftpInput");
+        if (ftpInput && ftp) {
+            ftpInput.value = ftp;
         }
 
         // Load chart ranges
@@ -155,6 +163,73 @@ class SettingsManager {
 
                 window.feedbackManager.showFeedback(
                     `✅ Max HR reset to calculated value: ${maxHR} bpm`,
+                    "success"
+                );
+            });
+        }
+    }
+
+    /**
+     * Setup FTP controls
+     */
+    setupFtpControls() {
+        const saveBtn = document.getElementById("saveFtpBtn");
+        const resetBtn = document.getElementById("resetFtpBtn");
+        const ftpInput = document.getElementById("ftpInput");
+
+        if (saveBtn) {
+            saveBtn.addEventListener("click", () => {
+                const newFtp = Number(ftpInput.value);
+
+                if (!newFtp || newFtp <= 0 || newFtp > 250) {
+                    window.feedbackManager.showError(
+                        "Please enter a valid FTP value (1-500)"
+                    );
+                    return;
+                }
+
+                window.dataProcessor.ftp = newFtp;
+                window.storageManager.saveFTP(newFtp);
+
+                // Update display
+                const maxFtpElement = document.getElementById("FTP");
+                if (maxFtpElement) {
+                    maxFtpElement.textContent = `${newFtp} watt`;
+                }
+
+                // Re-analyze
+                if (typeof window.analyze === "function") {
+                    window.analyze();
+                }
+
+                window.feedbackManager.showFeedback(
+                    `✅ FTP updated to ${newFtp} watt`,
+                    "success"
+                );
+            });
+        }
+
+        if (resetBtn) {
+            resetBtn.addEventListener("click", () => {
+                window.storageManager.clearFtp();
+
+                const { ftp } = window.powerAnalysis.estimateFTP();
+
+                if (ftpInput) {
+                    ftpInput.value = ftp;
+                }
+
+                const maxHRElement = document.getElementById("FTP");
+                if (maxHRElement) {
+                    maxHRElement.textContent = `${ftp} bpm`;
+                }
+
+                if (typeof window.analyze === "function") {
+                    window.analyze();
+                }
+
+                window.feedbackManager.showFeedback(
+                    `✅ FTP reset to calculated value: ${ftp} bpm`,
                     "success"
                 );
             });

@@ -1,439 +1,422 @@
 // js/analysis/intervalDetection.js
-// General interval training detector (v2.3)
-// Detects any iterative fast/slow pattern (e.g., 30/30, 1'/1', 3'/3', fartlek, ladder, pyramid)
-//
-// Public API:
-//   window.intervalDetector.detectInterval(run)
-//     -> {
-//          isInterval: boolean,
-//          intervals: number,            // number of FAST+SLOW pairs
-//          details: string|null,         // human-readable summary
-//          workoutType: 'structured-intervals' | 'fartlek-intervals' | 'none',
-//          patternSubtype: 'equal' | 'ladder' | 'pyramid' | 'mixed' | null,
-//          coefficientOfVariation?: number,
-//          debug?: { ... }
-//        }
-//
-// Expected input:
-//   run = {
-//     paceStream: { pace: number[], time?: number[] }, // pace in min/km; time in seconds (monotonic)
-//     distance?: number (km),
-//     duration?: number (seconds)
-//   }
+// General interval training detector (v2.6 - WITH HYSTERESIS)
+// Detects any iterative fast/slow pattern
 
 class IntervalDetector {
     constructor() {
-        // ---- Tunable parameters ----
+        this.MIN_INTERVAL_COUNT = 4;
+        this.MIN_SEGMENT_POINTS = 100; // Increased to avoid micro-segments
+        this.MIN_SEGMENT_DURATION = 30; // Increased from 20s
+        this.SMOOTHING_WINDOW = 9; // Increased smoothing
+        this.MIN_SPEED_SEPARATION = 0.2; // Increased to 20% minimum
 
-        // Pair counting (FAST+SLOW)
-        this.MIN_INTERVAL_COUNT = 2; // require at least 2 complete pairs
+        // Hysteresis: need bigger change to switch state
+        this.HYSTERESIS_PERCENT = 0.3; // 30% buffer zone around threshold
 
-        // Segment requirements (support short and long intervals)
-        this.MIN_INTERVAL_DURATION = 40; // min seconds per segment (fast OR slow); 25 allows 30/30
-        this.MIN_SEGMENT_POINTS = 5; // minimum data points in a segment
+        // For detecting actual intervals vs steady pace variation
+        this.MIN_PACE_RANGE_PERCENT = 0.25; // Need 25% pace variation for intervals
 
-        // Debounce: avoid rapid flips around thresholds
-        this.MIN_DWELL_TIME = 25; // seconds to confirm a state change (short to support short intervals)
-
-        // Smoothing (moving average window for pace stream)
-        this.SMOOTHING_WINDOW = 7; // samples; adjust for your sampling rate if needed
-
-        // Variability & separation
-        this.CV_THRESHOLD = 0.16; // coefficient of variation threshold over core section
-        this.MIN_SPEED_SEPARATION = 0.4; // min average speed gap between fast & slow (10%)
-
-        // Hysteresis (percent above avg speed)
-        this.FAST_ON_PCT = 0.1; // +10% to enter fast
-        this.FAST_OFF_PCT = 0.05; // +5% to remain fast (prevents chatter)
-
-        // Warmup/Cooldown detection (conservative)
-        this.WARMUP_STABLE_POINTS = 12;
-        this.WARMUP_RELATIVE_BAND = [0.9, 1.1]; // vs overall avg
-        this.COOLDOWN_SLOW_POINTS = 12;
-        this.COOLDOWN_RELATIVE_MIN = 1.1; // 10% slower than middle
-        this.COOLDOWN_MIN_SLOPE = 0.03; // min pace increase per step (slowing)
-
-        // Core length requirement
-        this.MIN_CORE_DURATION_SEC = 8 * 60; // require >= 8 min to confidently assess intervals
-
-        // Pattern classification thresholds
-        this.REGULARITY_CV_MAX = 0.35; // CV cutoff for "structured" durations
-        this.DURATION_RATIO_TOL = 0.6; // fast vs slow duration similarity per pair (min ratio)
-        this.LADDER_TOL = 0.2; // 20% monotonic tolerance for ladder detection
+        this.debugMode = false;
     }
 
-    /**
-     * Detect whether a run is an interval workout (any alternating fast/slow pattern).
-     * @param {Object} run
-     * @returns {{
-     *  isInterval: boolean,
-     *  intervals: number,
-     *  details: string|null,
-     *  workoutType: 'structured-intervals' | 'fartlek-intervals' | 'none',
-     *  patternSubtype: 'equal' | 'ladder' | 'pyramid' | 'mixed' | null,
-     *  coefficientOfVariation?: number,
-     *  debug?: any
-     * }}
-     */
+    log(...args) {
+        if (this.debugMode) {
+            console.log("[IntervalDetector]", ...args);
+        }
+    }
+
     detectInterval(run) {
+        this.log("=== Starting Interval Detection ===");
+
         if (!run || !run.paceStream || !Array.isArray(run.paceStream.pace)) {
-            return {
-                isInterval: false,
-                intervals: 0,
-                details: null,
-                workoutType: "none",
-                patternSubtype: null,
-            };
+            this.log("ERROR: No pace data provided");
+            return this._noIntervalResult("No pace data");
         }
 
+        this.log("Raw pace data points:", run.paceStream.pace.length);
+
+        // Filter valid paces
         const rawPaces = run.paceStream.pace.filter(
             (p) => Number.isFinite(p) && p > 0 && p < 20
         );
-        if (rawPaces.length < 30) {
-            return {
-                isInterval: false,
-                intervals: 0,
-                details: null,
-                workoutType: "none",
-                patternSubtype: null,
-            };
+
+        this.log("Valid pace points:", rawPaces.length);
+
+        if (rawPaces.length < 100) {
+            this.log("ERROR: Insufficient data points:", rawPaces.length);
+            return this._noIntervalResult(
+                `Only ${rawPaces.length} valid pace points (need at least 100)`
+            );
         }
 
-        // Build/validate time array
+        // Build time array
         const times = this._ensureTimesArray(run, rawPaces.length);
-        if (!times || times.length !== rawPaces.length) {
-            return {
-                isInterval: false,
-                intervals: 0,
-                details: null,
-                workoutType: "none",
-                patternSubtype: null,
-            };
-        }
+        const totalDuration = times[times.length - 1] - times[0];
+        this.log("Total duration:", this._formatDuration(totalDuration));
 
-        // Extract core (trim warmup/cooldown conservatively)
-        const core = this.extractCoreSection(rawPaces, times);
-        if (core.corePaces.length < 30) {
-            return {
-                isInterval: false,
-                intervals: 0,
-                details: null,
-                workoutType: "none",
-                patternSubtype: null,
-            };
-        }
-        const coreDuration =
-            core.coreTimes[core.coreTimes.length - 1] - core.coreTimes[0];
-        if (
-            !Number.isFinite(coreDuration) ||
-            coreDuration < this.MIN_CORE_DURATION_SEC
-        ) {
-            return {
-                isInterval: false,
-                intervals: 0,
-                details: null,
-                workoutType: "none",
-                patternSubtype: null,
-            };
-        }
+        // Smooth the data heavily to avoid noise
+        const smoothedPaces = this._smooth(rawPaces, this.SMOOTHING_WINDOW);
 
-        // Stats
-        const avgPace = this._mean(core.corePaces);
-        const stdDev = this.calculateStdDev(core.corePaces);
-        const coefficientOfVariation = stdDev / avgPace;
+        // Remove warmup and cooldown to get core section
+        const coreIndices = this._getCoreIndices(smoothedPaces);
+        const corePaces = smoothedPaces.slice(
+            coreIndices.start,
+            coreIndices.end
+        );
+        const coreTimes = times.slice(coreIndices.start, coreIndices.end);
 
-        // Segment detection (smoothing + hysteresis + dwell)
-        const segments = this.detectPaceSegments(
-            core.corePaces,
-            avgPace,
-            core.coreTimes
+        this.log(
+            "Core section:",
+            coreIndices.start,
+            "-",
+            coreIndices.end,
+            `(${this._formatDuration(coreTimes[coreTimes.length - 1] - coreTimes[0])})`
         );
 
-        // Build alternating pairs (FAST + SLOW)
-        const pairs = this._buildPairs(segments);
-        const pairCount = pairs.length;
-
-        // Separation check (fast vs slow speed gap)
-        const separationOk = this._hasMeaningfulSeparation(segments);
-
-        // Classification: structured vs fartlek; subtype (equal/ladder/pyramid/mixed)
-        const classification = this._classifyPattern(segments, pairs);
-
-        // Final decision
-        const isInterval =
-            separationOk &&
-            (pairCount >= this.MIN_INTERVAL_COUNT + 1 || // 3+ pairs => strong signal
-                (pairCount >= this.MIN_INTERVAL_COUNT &&
-                    coefficientOfVariation >= this.CV_THRESHOLD));
-
-        const workoutType = isInterval ? classification.workoutType : "none";
-        const patternSubtype = isInterval
-            ? classification.patternSubtype
-            : null;
-
-        let details = null;
-        if (isInterval) {
-            const fastPaceStr = this.formatPace(segments.avgFastPace);
-            const slowPaceStr = this.formatPace(segments.avgSlowPace);
-            const fastMedDur = this._formatDuration(
-                classification.fastMedianDur
+        if (corePaces.length < 50) {
+            this.log("ERROR: Core section too short");
+            return this._noIntervalResult(
+                "Core section too short after removing warmup/cooldown"
             );
-            const slowMedDur = this._formatDuration(
-                classification.slowMedianDur
-            );
-
-            details =
-                `${pairCount}x ${patternSubtype || "intervals"} ` +
-                `(Fast ~${fastMedDur} @ ${fastPaceStr}, ` +
-                `Recovery ~${slowMedDur} @ ${slowPaceStr})`;
         }
 
+        // Check if there's enough pace variation for intervals
+        const paceStats = this._analyzePaceVariation(corePaces);
+        this.log("Pace variation in core:");
+        this.log(
+            "  Min:",
+            paceStats.min.toFixed(2),
+            "max:",
+            paceStats.max.toFixed(2)
+        );
+        this.log("  Range:", paceStats.range.toFixed(2), "min/km");
+        this.log(
+            "  Mean:",
+            paceStats.mean.toFixed(2),
+            "CV:",
+            paceStats.cv.toFixed(3)
+        );
+        this.log(
+            "  Range/Mean ratio:",
+            ((paceStats.range / paceStats.mean) * 100).toFixed(1) + "%"
+        );
+
+        if (paceStats.range / paceStats.mean < this.MIN_PACE_RANGE_PERCENT) {
+            this.log("ERROR: Pace too steady for intervals");
+            return this._noIntervalResult(
+                `Pace too steady: ${((paceStats.range / paceStats.mean) * 100).toFixed(1)}% variation ` +
+                    `(need at least ${this.MIN_PACE_RANGE_PERCENT * 100}%)`
+            );
+        }
+
+        // Calculate threshold with percentiles (30th and 70th for better separation)
+        const sorted = [...corePaces].sort((a, b) => a - b);
+        const fastThreshold = sorted[Math.floor(sorted.length * 0.3)];
+        const slowThreshold = sorted[Math.floor(sorted.length * 0.7)];
+        const midThreshold = (fastThreshold + slowThreshold) / 2;
+
+        this.log("Thresholds:");
+        this.log(
+            "  Fast (30th percentile):",
+            fastThreshold.toFixed(2),
+            "min/km"
+        );
+        this.log(
+            "  Slow (70th percentile):",
+            slowThreshold.toFixed(2),
+            "min/km"
+        );
+        this.log("  Mid:", midThreshold.toFixed(2), "min/km");
+
+        // Segment with hysteresis
+        const segments = this._hysteresisSegmentation(
+            corePaces,
+            coreTimes,
+            midThreshold,
+            coreIndices.start
+        );
+
+        this.log("--- Segmentation Results ---");
+        this.log("Fast segments found:", segments.fastSegments.length);
+        this.log("Slow segments found:", segments.slowSegments.length);
+
+        if (segments.fastSegments.length > 0) {
+            this.log("Fast segments:");
+            segments.fastSegments.forEach((seg, i) => {
+                this.log(
+                    `  #${i + 1}: ${this._formatDuration(seg.duration)} at ${this._formatPace(seg.avgPace)}`
+                );
+            });
+        }
+
+        if (segments.slowSegments.length > 0) {
+            this.log("Slow segments:");
+            segments.slowSegments.forEach((seg, i) => {
+                this.log(
+                    `  #${i + 1}: ${this._formatDuration(seg.duration)} at ${this._formatPace(seg.avgPace)}`
+                );
+            });
+        }
+
+        if (
+            segments.fastSegments.length < this.MIN_INTERVAL_COUNT ||
+            segments.slowSegments.length < this.MIN_INTERVAL_COUNT
+        ) {
+            this.log("ERROR: Insufficient segments");
+            return this._noIntervalResult(
+                `Insufficient segments: ${segments.fastSegments.length} fast, ${segments.slowSegments.length} slow`
+            );
+        }
+
+        // Build pairs
+        const pairs = this._buildPairs(segments);
+        this.log("Alternating pairs found:", pairs.length);
+
+        if (pairs.length < this.MIN_INTERVAL_COUNT) {
+            this.log("ERROR: Not enough alternating pairs");
+            return this._noIntervalResult(
+                `Only ${pairs.length} alternating pairs`
+            );
+        }
+
+        // Check speed separation
+        const avgFastSpeed = this._mean(
+            segments.fastSegments.map((s) => s.avgSpeed)
+        );
+        const avgSlowSpeed = this._mean(
+            segments.slowSegments.map((s) => s.avgSpeed)
+        );
+        const speedDiff = (avgFastSpeed - avgSlowSpeed) / avgSlowSpeed;
+        const speedDiffPercent = (speedDiff * 100).toFixed(1);
+
+        this.log("--- Speed Separation ---");
+        this.log(
+            "Fast speed:",
+            avgFastSpeed.toFixed(3),
+            "km/min (",
+            this._formatPace(segments.avgFastPace),
+            ")"
+        );
+        this.log(
+            "Slow speed:",
+            avgSlowSpeed.toFixed(3),
+            "km/min (",
+            this._formatPace(segments.avgSlowPace),
+            ")"
+        );
+        this.log("Difference:", speedDiffPercent + "%");
+
+        if (speedDiff < this.MIN_SPEED_SEPARATION) {
+            this.log("ERROR: Speed separation insufficient");
+            return this._noIntervalResult(
+                `Speed separation too low: ${speedDiffPercent}% (need ${this.MIN_SPEED_SEPARATION * 100}%)`
+            );
+        }
+
+        // Additional check: segments should alternate reasonably
+        const alternationScore = this._checkAlternationPattern(segments);
+        this.log(
+            "Alternation score:",
+            alternationScore.toFixed(2),
+            "(1.0 = perfect alternation)"
+        );
+
+        if (alternationScore < 0.6) {
+            this.log("ERROR: Poor alternation pattern");
+            return this._noIntervalResult(
+                `Poor alternation pattern: ${alternationScore.toFixed(2)} (need at least 0.6)`
+            );
+        }
+
+        const classification = this._classifyPattern(segments, pairs);
+        const details = this._buildDetailsString(
+            pairs.length,
+            segments,
+            classification
+        );
+
+        this.log("=== INTERVAL DETECTED ===");
+        this.log(details);
+
         return {
-            isInterval,
-            intervals: isInterval ? pairCount : 0,
+            isInterval: true,
+            intervals: pairs.length,
             details,
-            workoutType,
-            patternSubtype,
-            coefficientOfVariation,
+            workoutType: classification.workoutType,
+            patternSubtype: classification.patternSubtype,
+            coefficientOfVariation: paceStats.cv,
             debug: {
-                coreDuration,
-                pairCount,
-                separationOk,
+                pairCount: pairs.length,
+                speedDiffPercent: parseFloat(speedDiffPercent),
+                alternationScore,
                 avgFastPace: segments.avgFastPace,
                 avgSlowPace: segments.avgSlowPace,
-                fastDurations: classification.fastDurations,
-                slowDurations: classification.slowDurations,
-                fastCV: classification.fastCV,
-                slowCV: classification.slowCV,
+                fastSegments: segments.fastSegments.length,
+                slowSegments: segments.slowSegments.length,
+                coreSection: coreIndices,
             },
         };
     }
 
-    // ---------------- Core extraction (warmup/cooldown) ----------------
-
-    extractCoreSection(paces, times) {
-        if (paces.length !== times.length) {
-            return {
-                corePaces: paces,
-                coreTimes: times,
-                warmupEnd: 0,
-                cooldownStart: paces.length,
-            };
-        }
-
-        if (paces.length < 60) {
-            return {
-                corePaces: paces,
-                coreTimes: times,
-                warmupEnd: 0,
-                cooldownStart: paces.length,
-            };
-        }
-
-        const windowSize = Math.max(5, Math.floor(paces.length / 30));
-        const movingAvg = this.calculateMovingAverage(paces, windowSize);
-
-        const warmupEnd = this.findWarmupEnd(paces, movingAvg);
-        const cooldownStart = this.findCooldownStart(paces, movingAvg);
-
-        const start = Math.max(0, Math.min(warmupEnd, paces.length - 1));
-        const end = Math.max(start + 1, Math.min(cooldownStart, paces.length));
-
-        const corePaces = paces.slice(start, end);
-        const coreTimes = times.slice(start, end);
-
-        return { corePaces, coreTimes, warmupEnd: start, cooldownStart: end };
-    }
-
-    calculateMovingAverage(values, windowSize) {
-        const res = [];
-        for (let i = 0; i < values.length; i++) {
-            const a = Math.max(0, i - Math.floor(windowSize / 2));
-            const b = Math.min(
-                values.length,
-                i + Math.floor(windowSize / 2) + 1
-            );
-            const avg = this._mean(values.slice(a, b));
-            res.push(avg);
-        }
-        return res;
-    }
-
-    findWarmupEnd(paces, movingAvg) {
-        const n = paces.length;
-        const searchEnd = Math.min(
-            Math.floor(n * 0.4),
-            n - this.WARMUP_STABLE_POINTS - 1
-        );
-        if (searchEnd <= 10) return 0;
-
-        const overallAvg = this._mean(paces);
-        const [low, high] = this.WARMUP_RELATIVE_BAND;
-        const required = this.WARMUP_STABLE_POINTS;
-
-        let consecutive = 0;
-        for (let i = 2; i < searchEnd; i++) {
-            const paceChange = movingAvg[i] - movingAvg[i - 1]; // + means slowing
-            const relative = movingAvg[i] / overallAvg;
-            const stabilizing = Math.abs(paceChange) < 0.02; // nearly flat
-            const inBand = relative > low && relative < high;
-
-            if (stabilizing && inBand) {
-                consecutive++;
-                if (consecutive >= required) {
-                    return Math.max(0, i - required);
-                }
-            } else {
-                consecutive = 0;
-            }
-        }
-        return 0;
-    }
-
-    findCooldownStart(paces, movingAvg) {
-        const n = paces.length;
-        const searchStart = Math.max(
-            Math.floor(n * 0.6),
-            this.COOLDOWN_SLOW_POINTS + 1
-        );
-
-        const midStart = Math.floor(n * 0.3);
-        const midEnd = Math.floor(n * 0.7);
-        const middleAvg = this._mean(paces.slice(midStart, midEnd));
-
-        let consecutive = 0;
-        for (let i = searchStart; i < n - 2; i++) {
-            const paceChange = movingAvg[i + 1] - movingAvg[i]; // + means slowing
-            const relative = movingAvg[i] / middleAvg;
-
-            // BOTH sustained slowing AND notably slower than middle
-            if (
-                paceChange > this.COOLDOWN_MIN_SLOPE &&
-                relative > this.COOLDOWN_RELATIVE_MIN
-            ) {
-                consecutive++;
-                if (consecutive >= this.COOLDOWN_SLOW_POINTS) {
-                    return Math.max(searchStart, i - this.COOLDOWN_SLOW_POINTS);
-                }
-            } else {
-                consecutive = 0;
-            }
-        }
-        return n;
-    }
-
-    // ---------------- Segment detection ----------------
-
-    detectPaceSegments(paces, avgPace, times) {
-        const MIN_DUR = this.MIN_INTERVAL_DURATION;
-        const MIN_POINTS = this.MIN_SEGMENT_POINTS;
-
-        // Smooth pace before classifying (reduces noise flips)
-        const smoothed = this._smooth(paces, this.SMOOTHING_WINDOW);
-
-        const speeds = smoothed.map((p) => 1 / p);
-        const avgSpeed = 1 / avgPace;
-        const speedStdDev = this.calculateStdDev(speeds);
-
-        // Hysteresis thresholds: stronger of percentage vs std-dev
-        const fastOn = Math.max(
-            avgSpeed * (1 + this.FAST_ON_PCT),
-            avgSpeed + 0.8 * speedStdDev
-        );
-        const fastOff = Math.max(
-            avgSpeed * (1 + this.FAST_OFF_PCT),
-            avgSpeed + 0.5 * speedStdDev
-        );
-
-        let state = null; // 'fast' | 'slow'
-        let segStartIdx = 0;
-        let segStartTime = times[0];
-        let dwellAnchorTime = times[0];
-
-        let segPaces = [];
-        let segSpeeds = [];
-
+    _hysteresisSegmentation(paces, times, threshold, globalStartIdx = 0) {
         const fastSegments = [];
         const slowSegments = [];
 
-        const commit = (segState, endIdx, endTime, sp, ss) => {
-            const duration = endTime - segStartTime;
-            if (
-                Number.isFinite(duration) &&
-                duration >= MIN_DUR &&
-                sp.length >= MIN_POINTS
-            ) {
-                const avgP = this._mean(sp);
-                const avgS = this._mean(ss);
-                const obj = {
-                    start: segStartIdx,
-                    end: endIdx,
-                    avgPace: avgP,
-                    avgSpeed: avgS,
-                    duration,
-                };
-                (segState === "fast" ? fastSegments : slowSegments).push(obj);
-            }
-        };
+        const upperThreshold = threshold * (1 - this.HYSTERESIS_PERCENT);
+        const lowerThreshold = threshold * (1 + this.HYSTERESIS_PERCENT);
 
-        for (let i = 0; i < speeds.length; i++) {
-            const t = times[i];
-            const spd = speeds[i];
+        this.log(
+            "Hysteresis thresholds: fast <",
+            upperThreshold.toFixed(2),
+            ", slow >",
+            lowerThreshold.toFixed(2)
+        );
 
-            const isFastCandidate =
-                state === "fast" ? spd > fastOff : spd > fastOn;
+        let currentState = null; // 'fast', 'slow', or null
+        let segmentStart = 0;
+        let segmentPaces = [];
+        let stateChangesPending = 0;
 
-            if (state === null) {
-                state = isFastCandidate ? "fast" : "slow";
-                segStartIdx = i;
-                segStartTime = t;
-                dwellAnchorTime = t;
-                segPaces = [paces[i]];
-                segSpeeds = [spd];
-                continue;
-            }
+        for (let i = 0; i < paces.length; i++) {
+            const pace = paces[i];
 
-            const desired = isFastCandidate ? "fast" : "slow";
-            if (desired !== state) {
-                // Debounce: require sustained desire for MIN_DWELL_TIME
-                if (t - dwellAnchorTime >= this.MIN_DWELL_TIME) {
-                    // close previous
-                    commit(state, i, t, segPaces, segSpeeds);
-                    // start new
-                    state = desired;
-                    segStartIdx = i;
-                    segStartTime = t;
-                    segPaces = [paces[i]];
-                    segSpeeds = [spd];
-                    dwellAnchorTime = t;
-                }
+            // Determine if we should be fast or slow based on current state
+            let shouldBeFast;
+            if (currentState === null) {
+                // Initial state determination
+                shouldBeFast = pace < threshold;
+            } else if (currentState === "fast") {
+                // Stay fast unless pace goes above lower threshold
+                shouldBeFast = pace < lowerThreshold;
             } else {
-                // staying in same state: refresh dwell anchor and accumulate
-                dwellAnchorTime = t;
-                segPaces.push(paces[i]);
-                segSpeeds.push(spd);
+                // currentState === 'slow'
+                // Stay slow unless pace goes below upper threshold
+                shouldBeFast = pace < upperThreshold;
+            }
+
+            const newState = shouldBeFast ? "fast" : "slow";
+
+            if (currentState === null) {
+                currentState = newState;
+                segmentStart = i;
+                segmentPaces = [pace];
+                stateChangesPending = 0;
+            } else if (newState === currentState) {
+                segmentPaces.push(pace);
+                stateChangesPending = 0;
+            } else {
+                // Potential state change - require confirmation
+                stateChangesPending++;
+
+                if (stateChangesPending >= 3) {
+                    // Require 3 consecutive points to confirm
+                    // Save previous segment if valid
+                    if (segmentPaces.length >= this.MIN_SEGMENT_POINTS) {
+                        const duration =
+                            times[i - stateChangesPending] -
+                            times[segmentStart];
+
+                        if (duration >= this.MIN_SEGMENT_DURATION) {
+                            const segment = {
+                                start: globalStartIdx + segmentStart,
+                                end: globalStartIdx + i - stateChangesPending,
+                                duration,
+                                avgPace: this._mean(segmentPaces),
+                                avgSpeed: 1 / this._mean(segmentPaces),
+                            };
+
+                            if (currentState === "fast") {
+                                fastSegments.push(segment);
+                            } else {
+                                slowSegments.push(segment);
+                            }
+                        }
+                    }
+
+                    // Start new segment
+                    currentState = newState;
+                    segmentStart = i - stateChangesPending + 1;
+                    segmentPaces = paces.slice(segmentStart, i + 1);
+                    stateChangesPending = 0;
+                } else {
+                    segmentPaces.push(pace);
+                }
             }
         }
 
-        // Close tail segment
-        if (segPaces.length >= MIN_POINTS) {
-            const lastTime = times[times.length - 1];
-            commit(state, speeds.length, lastTime, segPaces, segSpeeds);
+        // Handle last segment
+        if (segmentPaces.length >= this.MIN_SEGMENT_POINTS) {
+            const duration = times[times.length - 1] - times[segmentStart];
+
+            if (duration >= this.MIN_SEGMENT_DURATION) {
+                const segment = {
+                    start: globalStartIdx + segmentStart,
+                    end: globalStartIdx + paces.length - 1,
+                    duration,
+                    avgPace: this._mean(segmentPaces),
+                    avgSpeed: 1 / this._mean(segmentPaces),
+                };
+
+                if (currentState === "fast") {
+                    fastSegments.push(segment);
+                } else {
+                    slowSegments.push(segment);
+                }
+            }
         }
 
-        // Aggregate pace summaries
-        let avgFastPace = avgPace;
-        let avgSlowPace = avgPace;
-
-        if (fastSegments.length && slowSegments.length) {
-            avgFastPace = this._mean(fastSegments.map((s) => s.avgPace));
-            avgSlowPace = this._mean(slowSegments.map((s) => s.avgPace));
-        }
-
-        return { fastSegments, slowSegments, avgFastPace, avgSlowPace };
+        return {
+            fastSegments,
+            slowSegments,
+            avgFastPace: this._mean(fastSegments.map((s) => s.avgPace)),
+            avgSlowPace: this._mean(slowSegments.map((s) => s.avgPace)),
+        };
     }
 
-    // ---------------- Decision helpers ----------------
+    _getCoreIndices(paces) {
+        // Remove first and last 10% OR detect actual warmup/cooldown
+        const defaultSkip = Math.floor(paces.length * 0.1);
+
+        // Simple approach: skip 10% from each end
+        return {
+            start: defaultSkip,
+            end: paces.length - defaultSkip,
+        };
+    }
+
+    _analyzePaceVariation(paces) {
+        const min = Math.min(...paces);
+        const max = Math.max(...paces);
+        const mean = this._mean(paces);
+        const range = max - min;
+        const cv = this._cv(paces);
+
+        return { min, max, mean, range, cv };
+    }
+
+    _checkAlternationPattern(segments) {
+        // Create sequence of all segments sorted by start time
+        const seq = [
+            ...segments.fastSegments.map((s) => ({ ...s, type: "fast" })),
+            ...segments.slowSegments.map((s) => ({ ...s, type: "slow" })),
+        ].sort((a, b) => a.start - b.start);
+
+        if (seq.length < 2) return 0;
+
+        let alternations = 0;
+        let consecutiveSame = 0;
+
+        for (let i = 1; i < seq.length; i++) {
+            if (seq[i].type !== seq[i - 1].type) {
+                alternations++;
+            } else {
+                consecutiveSame++;
+            }
+        }
+
+        // Perfect alternation = 1.0, no alternation = 0
+        return alternations / (seq.length - 1);
+    }
 
     _buildPairs(segments) {
         const seq = [
@@ -446,188 +429,91 @@ class IntervalDetector {
             const a = seq[i];
             const b = seq[i + 1];
             if (a.type !== b.type) {
-                // duration similarity per pair (tolerant for varied intervals)
-                const ratio =
-                    Math.min(a.duration, b.duration) /
-                    Math.max(a.duration, b.duration);
-                if (ratio >= this.DURATION_RATIO_TOL) {
-                    // save as [fast, slow]
-                    if (a.type === "fast") pairs.push([a, b]);
-                    else pairs.push([b, a]);
+                if (a.type === "fast") {
+                    pairs.push([a, b]);
                 } else {
-                    // even if durations differ, still count as a pair (fartlek); comment out to be stricter
-                    if (a.type === "fast") pairs.push([a, b]);
-                    else pairs.push([b, a]);
+                    pairs.push([b, a]);
                 }
             }
         }
         return pairs;
     }
 
-    _hasMeaningfulSeparation(segments) {
-        if (!segments.fastSegments.length || !segments.slowSegments.length)
-            return false;
-        const avgFast = this._mean(
-            segments.fastSegments.map((s) => s.avgSpeed)
-        );
-        const avgSlow = this._mean(
-            segments.slowSegments.map((s) => s.avgSpeed)
-        );
-        const diff = (avgFast - avgSlow) / avgSlow;
-        return diff >= this.MIN_SPEED_SEPARATION;
-    }
-
     _classifyPattern(segments, pairs) {
         const fastDur = segments.fastSegments.map((s) => s.duration);
         const slowDur = segments.slowSegments.map((s) => s.duration);
-
         const fastCV = this._cv(fastDur);
         const slowCV = this._cv(slowDur);
 
-        const fastMedian = this._median(fastDur);
-        const slowMedian = this._median(slowDur);
-
-        // Ladder/pyramid detection (based on FAST durations sequence)
-        const subtype = this._detectSubtype(segments.fastSegments);
-
-        // Structured vs fartlek:
-        // - Structured: durations relatively consistent (CV <= REGULARITY_CV_MAX)
-        // - Fartlek: durations vary widely (CV > REGULARITY_CV_MAX), still alternates
-        const structured =
-            Number.isFinite(fastCV) &&
-            Number.isFinite(slowCV) &&
-            fastCV <= this.REGULARITY_CV_MAX &&
-            slowCV <= this.REGULARITY_CV_MAX;
-
-        let workoutType = "fartlek-intervals";
-        if (structured) workoutType = "structured-intervals";
-
-        // Map subtype: equal if subtype 'equal', else ladder/pyramid/mixed
-        let patternSubtype = subtype;
+        const structured = fastCV <= 0.35 && slowCV <= 0.35;
 
         return {
-            workoutType,
-            patternSubtype,
+            workoutType: structured
+                ? "structured-intervals"
+                : "fartlek-intervals",
+            patternSubtype: this._detectSubtype(segments.fastSegments),
             fastDurations: fastDur,
             slowDurations: slowDur,
             fastCV,
             slowCV,
-            fastMedianDur: fastMedian,
-            slowMedianDur: slowMedian,
         };
     }
 
     _detectSubtype(fastSegments) {
         if (!fastSegments || fastSegments.length < 2) return "mixed";
         const d = fastSegments.map((s) => s.duration);
-
         const median = this._median(d);
-        const max = Math.max(...d);
-        const min = Math.min(...d);
 
-        // Equal: durations all within ±20% of median
-        const equalish = d.every(
-            (x) => Math.abs(x - median) <= median * this.LADDER_TOL
-        );
+        const equalish = d.every((x) => Math.abs(x - median) <= median * 0.2);
         if (equalish) return "equal";
 
-        // Ladder/pyramid: check monotonic increase/decrease with one peak
-        const peakIdx = d.indexOf(max);
-        const increasingBeforePeak = this._isMonotonic(
-            d.slice(0, peakIdx),
-            +1,
-            this.LADDER_TOL
-        );
-        const decreasingAfterPeak = this._isMonotonic(
-            d.slice(peakIdx + 1),
-            -1,
-            this.LADDER_TOL
-        );
-
-        if (
-            increasingBeforePeak &&
-            decreasingAfterPeak &&
-            peakIdx > 0 &&
-            peakIdx < d.length - 1
-        ) {
-            return "pyramid";
-        }
-        if (increasingBeforePeak && peakIdx === d.length - 1) {
-            return "ladder";
-        }
-        if (decreasingAfterPeak && peakIdx === 0) {
-            return "ladder";
-        }
         return "mixed";
     }
 
-    _isMonotonic(arr, direction, tol) {
-        if (arr.length < 2) return false;
-        // direction: +1 for increasing, -1 for decreasing
-        for (let i = 1; i < arr.length; i++) {
-            const prev = arr[i - 1],
-                cur = arr[i];
-            const ok =
-                direction > 0
-                    ? cur >= prev * (1 - tol)
-                    : cur <= prev * (1 + tol);
-            if (!ok) return false;
-        }
-        return true;
+    _buildDetailsString(pairCount, segments, classification) {
+        const avgFast = this._formatPace(segments.avgFastPace);
+        const avgSlow = this._formatPace(segments.avgSlowPace);
+        const fastMedian = this._formatDuration(
+            this._median(classification.fastDurations)
+        );
+        const slowMedian = this._formatDuration(
+            this._median(classification.slowDurations)
+        );
+
+        return (
+            `${pairCount} intervals detected (${classification.workoutType}, ${classification.patternSubtype}). ` +
+            `Fast: ${avgFast} for ~${fastMedian}, Slow: ${avgSlow} for ~${slowMedian}`
+        );
     }
 
-    // ---------------- Utilities ----------------
-
-    calculateStdDev(values) {
-        if (!values || values.length === 0) return 0;
-        const m = this._mean(values);
-        const v = this._mean(values.map((x) => (x - m) ** 2));
-        return Math.sqrt(v);
+    _formatPace(pace) {
+        const min = Math.floor(pace);
+        const sec = Math.round((pace - min) * 60);
+        return `${min}:${sec.toString().padStart(2, "0")}/km`;
     }
 
-    formatPace(pace) {
-        const minutes = Math.floor(pace);
-        const seconds = Math.round((pace - minutes) * 60);
-        return `${minutes}:${seconds.toString().padStart(2, "0")}/km`;
+    _formatDuration(seconds) {
+        if (!Number.isFinite(seconds)) return "—";
+        const m = Math.floor(seconds / 60);
+        const s = Math.round(seconds % 60);
+        return `${m}:${s.toString().padStart(2, "0")}`;
     }
 
-    calculateAveragePace(run) {
-        if (run.paceStream && run.paceStream.pace) {
-            const valid = run.paceStream.pace.filter((p) => p > 0 && p < 20);
-            if (valid.length) return this._mean(valid);
-        }
-        if (run.distance > 0 && run.duration > 0) {
-            return run.duration / 60 / run.distance; // min/km
-        }
-        return null;
-    }
-
-    calculateAverageSpeed(activity) {
-        if (!activity.distance || !activity.duration) return null;
-        const distanceKm = activity.distance;
-        const durationHours = activity.duration / 3600;
-        if (durationHours === 0) return null;
-        return distanceKm / durationHours;
-    }
-
-    calculateAverageSwimPace(activity) {
-        if (!activity.distance || !activity.duration) return null;
-        const distanceMeters = activity.distance * 1000;
-        const durationMinutes = activity.duration / 60;
-        if (distanceMeters === 0) return null;
-        return (durationMinutes / distanceMeters) * 100; // min/100m
-    }
-
-    formatSwimPace(pace) {
-        if (!pace && pace !== 0) return "—";
-        const minutes = Math.floor(pace);
-        const seconds = Math.round((pace - minutes) * 60);
-        return `${minutes}:${seconds.toString().padStart(2, "0")}/100m`;
+    _noIntervalResult(reason) {
+        this.log("=== NO INTERVAL DETECTED ===");
+        this.log("Reason:", reason);
+        return {
+            isInterval: false,
+            intervals: 0,
+            details: null,
+            workoutType: "none",
+            patternSubtype: null,
+            reason,
+        };
     }
 
     _mean(arr) {
-        if (!arr || !arr.length) return 0;
-        return arr.reduce((s, v) => s + v, 0) / arr.length;
+        return arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : 0;
     }
 
     _median(arr) {
@@ -643,51 +529,48 @@ class IntervalDetector {
         if (!arr || arr.length === 0) return Infinity;
         const m = this._mean(arr);
         if (m === 0) return Infinity;
-        const sd = this.calculateStdDev(arr);
-        return sd / m;
+        const variance = this._mean(arr.map((x) => (x - m) ** 2));
+        return Math.sqrt(variance) / m;
     }
 
-    _smooth(values, window = 5) {
+    _smooth(values, window) {
         const out = [];
+        const half = Math.floor(window / 2);
         for (let i = 0; i < values.length; i++) {
-            const a = Math.max(0, i - Math.floor(window / 2));
-            const b = Math.min(values.length, i + Math.floor(window / 2) + 1);
-            out.push(this._mean(values.slice(a, b)));
+            const start = Math.max(0, i - half);
+            const end = Math.min(values.length, i + half + 1);
+            out.push(this._mean(values.slice(start, end)));
         }
         return out;
     }
 
-    _formatDuration(seconds) {
-        if (!Number.isFinite(seconds)) return "—";
-        const m = Math.floor(seconds / 60);
-        const s = Math.round(seconds % 60);
-        return `${m}:${s.toString().padStart(2, "0")}`;
-    }
-
     _ensureTimesArray(run, length) {
-        // If provided, validate
-        if (
-            run.paceStream.time &&
-            Array.isArray(run.paceStream.time) &&
-            run.paceStream.time.length === length
-        ) {
-            return run.paceStream.time.slice();
+        if (run.paceStream?.time?.length === length) {
+            this.log("Using provided time array");
+            return run.paceStream.time;
         }
+        if (run.duration && length > 1) {
+            const apparentSamplingRate = run.duration / (length - 1);
 
-        // Otherwise, infer from total duration if available
-        if (Number.isFinite(run.duration) && run.duration > 0 && length > 1) {
+            if (apparentSamplingRate < 0.1) {
+                this.log("WARNING: Duration in minutes, converting to seconds");
+                const durationInSeconds = run.duration * 60;
+                const dt = durationInSeconds / (length - 1);
+                this.log(
+                    "Corrected duration:",
+                    this._formatDuration(durationInSeconds)
+                );
+                return Array.from({ length }, (_, i) => i * dt);
+            }
+
             const dt = run.duration / (length - 1);
-            const times = new Array(length);
-            for (let i = 0; i < length; i++) times[i] = i * dt;
-            return times;
+            this.log("Sampling rate:", dt.toFixed(2), "s/point");
+            return Array.from({ length }, (_, i) => i * dt);
         }
-
-        // Fallback: assume 1 Hz sampling
-        const times = new Array(length);
-        for (let i = 0; i < length; i++) times[i] = i;
-        return times;
+        this.log("No duration provided, assuming 1Hz sampling");
+        return Array.from({ length }, (_, i) => i);
     }
 }
 
-// Export singleton for browser
+// Export singleton
 window.intervalDetector = new IntervalDetector();

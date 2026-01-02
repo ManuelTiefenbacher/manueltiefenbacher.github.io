@@ -642,7 +642,10 @@ class SwimRenderer {
         const container = document.getElementById("trainingLoadAnalysisSwim");
         if (!container) return;
 
-        const analysis = window.trainingLoadAnalyzer.analyze(activities || []);
+        const analysis = window.trainingLoadAnalyzer.analyze(
+            activities || [],
+            "swim"
+        );
 
         const statusIcon = { green: "🟢", yellow: "🟡", red: "🔴" };
         let html = '<div class="training-analysis">';

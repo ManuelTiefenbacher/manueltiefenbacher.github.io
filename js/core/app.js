@@ -260,9 +260,11 @@ class TriRunalyzer {
         }
 
         // Default value
-        const estimatedFTP = window.powerAnalyzer.estimateFTP();
-        if (estimatedFTP) {
-            window.storageManager.saveFTP(estimatedFTP);
+        if (window.dataProcessor.FTP === 250) {
+            const estimatedFTP = window.powerAnalyzer.estimateFTP();
+            if (estimatedFTP) {
+                window.storageManager.saveFTP(estimatedFTP);
+            }
         }
 
         // Render ride-specific UI

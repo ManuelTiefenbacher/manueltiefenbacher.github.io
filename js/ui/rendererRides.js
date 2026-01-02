@@ -184,8 +184,8 @@ class RideRenderer {
                 data: weeklyData.map((w) => w.avgSpeed),
                 borderColor: "rgba(251, 188, 4, 1)",
                 backgroundColor: "rgba(251, 188, 4, 0.1)",
-                borderWidth: 3,
-                pointRadius: 4,
+                borderWidth: 1,
+                pointRadius: 3,
                 pointBackgroundColor: "rgba(251, 188, 4, 1)",
                 fill: false,
                 yAxisID: "y2",
@@ -252,14 +252,22 @@ class RideRenderer {
                     },
                     y2: {
                         position: "right",
-                        beginAtZero: false,
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: "Speed (km/h)",
+                            color: "#fbbc04",
+                        },
                         ticks: {
                             color: "#fbbc04",
-                            callback: (value) => `${value.toFixed(1)} km/h`,
+                            callback: (value) => `${value.toFixed(1)}`,
                         },
                         grid: {
-                            display: false,
+                            drawOnChartArea: false, // Prevents grid lines from overlapping with y-axis
                         },
+                        suggestedMax: Math.ceil(
+                            Math.max(...weeklyData.map((w) => w.avgSpeed)) + 2
+                        ),
                     },
                     x: {
                         stacked: true,
@@ -300,7 +308,7 @@ class RideRenderer {
             weekData.totalDuration += activity.duration || 0;
 
             const avgSpeed =
-                window.intervalDetector.calculateAverageSpeed(activity);
+                window.helpers.calculateAverageSpeed(activity);
             if (avgSpeed) {
                 weekData.speeds.push(avgSpeed);
             }
@@ -571,8 +579,6 @@ class RideRenderer {
                 totalDataPoints > 0 ? (zones[z] / totalDataPoints) * 100 : 0;
         });
 
-        console.log({ percentages, distances, totalDataPoints });
-
         return { percentages, distances, totalDataPoints };
     }
 
@@ -585,7 +591,7 @@ class RideRenderer {
         div.innerHTML = "";
 
         const recent = (activities || []).filter(
-            (a) => window.helpers.daysAgo(a.date) <= 100
+            (a) => window.helpers.daysAgo(a.date) <= 28
         );
         const sorted = [...recent].sort((a, b) => b.date - a.date);
 
@@ -601,7 +607,7 @@ class RideRenderer {
         const cssClass = window.runClassifier.getCategoryClass(category);
 
         const el = document.createElement("div");
-        el.className = `ride ${cssClass}`;
+        el.className = `run ${cssClass}`;
 
         const intervalInfo = window.intervalDetector.detectInterval(ride);
         const tooltip = this.createRideTooltip(
@@ -621,12 +627,12 @@ class RideRenderer {
         } else if (powerDataType === "basic") {
             badges += '<span class="badge basic-power">Basic Power</span>';
         }
-        if (isLong) {
+        /*if (isLong) {
             badges += '<span class="badge long-ride">Long Ride</span>';
-        }
+        }*/
 
         el.innerHTML = `
-      <span>${window.helpers.formatDateFull(ride.date)} — ${category}${isLong ? " (Long)" : ""}</span>
+      <span>${window.helpers.formatDateFull(ride.date)} — ${category}</span>
       <span>${badges}<span class="badge">${(ride.distance ?? 0).toFixed(1)} km</span></span>
       ${tooltip}
     `;
@@ -659,7 +665,7 @@ class RideRenderer {
       `;
         }
 
-        const avgSpeed = window.intervalDetector.calculateAverageSpeed(ride);
+        const avgSpeed = window.helpers.calculateAverageSpeed(ride);
         if (avgSpeed) {
             html += `
         <div class="tooltip-row">
@@ -731,7 +737,10 @@ class RideRenderer {
         const container = document.getElementById("trainingLoadAnalysisRide");
         if (!container) return;
 
-        const analysis = window.trainingLoadAnalyzer.analyze(activities || []);
+        const analysis = window.trainingLoadAnalyzer.analyze(
+            activities || [],
+            "ride"
+        );
 
         const statusIcon = { green: "🟢", yellow: "🟡", red: "🔴" };
         let html = '<div class="training-analysis">';

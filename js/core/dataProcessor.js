@@ -7,6 +7,7 @@ class DataProcessor {
         this.rides = [];
         this.swims = [];
         this.hrMax = 190;
+        this.FTP = 250;
         this.zones = {
             z2Upper: 0.75,
             z3Upper: 0.85,
@@ -166,7 +167,6 @@ class DataProcessor {
      * Add rides from any source with automatic deduplication
      */
     addRides(newRides, source = "unknown") {
-        console.log(newRides);
         const normalized = newRides.map((ride) => ({
             ...this.normalizeRide(ride),
             source,
