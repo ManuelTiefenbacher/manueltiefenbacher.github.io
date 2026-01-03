@@ -499,7 +499,6 @@ class RunRenderer {
     /* ---------------- Timeline ---------------- */
 
     renderTimeline(activities) {
-        console.log(activities);
         const div = document.getElementById("timeline");
         if (!div) return;
 

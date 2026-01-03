@@ -1,5 +1,5 @@
 // js/ui/settings.js
-// Settings management (HR Max, Zone configuration, Chart ranges, and Presets)
+// Settings management (HR Max, FTP, Zone configuration, Chart ranges, and Presets)
 
 class SettingsManager {
     constructor() {
@@ -44,7 +44,6 @@ class SettingsManager {
         this.setupHRMaxControls();
         this.setupFtpControls();
         this.setupZoneControls();
-        this.setupScanButton();
         this.setupChartRangeControls();
         this.setupPresetButtons();
         this.loadSavedSettings();
@@ -108,6 +107,7 @@ class SettingsManager {
     setupHRMaxControls() {
         const saveBtn = document.getElementById("saveHrBtn");
         const resetBtn = document.getElementById("resetHrBtn");
+        const scanBtn = document.getElementById("scanActivitiesBtn");
         const maxHrInput = document.getElementById("maxHrInput");
 
         if (saveBtn) {
@@ -167,6 +167,61 @@ class SettingsManager {
                 );
             });
         }
+
+        if (scanBtn) {
+            scanBtn.addEventListener("click", () => {
+                const runs = window.dataProcessor.runs;
+
+                if (runs.length === 0) {
+                    window.feedbackManager.showError(
+                        "No activities loaded. Please upload a ZIP file or connect to Strava first."
+                    );
+                    return;
+                }
+
+                window.feedbackManager.showFeedback(
+                    "⏳ Scanning all activities for maximum HR...",
+                    "info"
+                );
+
+                const { maxHR, activity } =
+                    window.dataProcessor.calculateMaxHR();
+
+                if (maxHR > 0) {
+                    window.storageManager.saveHRMax(maxHR);
+
+                    // Update input
+                    if (maxHrInput) {
+                        maxHrInput.value = maxHR;
+                    }
+
+                    // Update display
+                    const maxHRElement = document.getElementById("maxHR");
+                    if (maxHRElement) {
+                        maxHRElement.textContent = `${maxHR} bpm`;
+                    }
+
+                    // Re-analyze
+                    if (typeof window.analyze === "function") {
+                        window.analyze();
+                    }
+
+                    const activityDate = window.helpers.formatDateFull(
+                        activity.date
+                    );
+                    const activityDistance = activity.distance.toFixed(1);
+
+                    window.feedbackManager.showFeedback(
+                        `✅ Max HR found: ${maxHR} bpm (from ${activityDistance} km run on ${activityDate})`,
+                        "success"
+                    );
+                } else {
+                    window.feedbackManager.showError(
+                        "No heart rate data found in activities"
+                    );
+                }
+            });
+        }
     }
 
     /**
@@ -175,15 +230,16 @@ class SettingsManager {
     setupFtpControls() {
         const saveBtn = document.getElementById("saveFtpBtn");
         const resetBtn = document.getElementById("resetFtpBtn");
+        const scanBtn = document.getElementById("scanRidesBtn");
         const ftpInput = document.getElementById("ftpInput");
 
         if (saveBtn) {
             saveBtn.addEventListener("click", () => {
                 const newFtp = Number(ftpInput.value);
 
-                if (!newFtp || newFtp <= 0 || newFtp > 250) {
+                if (!newFtp || newFtp <= 0 || newFtp > 600) {
                     window.feedbackManager.showError(
-                        "Please enter a valid FTP value (1-500)"
+                        "Please enter a valid FTP value (1-600)"
                     );
                     return;
                 }
@@ -192,9 +248,9 @@ class SettingsManager {
                 window.storageManager.saveFTP(newFtp);
 
                 // Update display
-                const maxFtpElement = document.getElementById("FTP");
-                if (maxFtpElement) {
-                    maxFtpElement.textContent = `${newFtp} watt`;
+                const ftpElement = document.getElementById("FTP");
+                if (ftpElement) {
+                    ftpElement.textContent = `${newFtp} W`;
                 }
 
                 // Re-analyze
@@ -203,7 +259,7 @@ class SettingsManager {
                 }
 
                 window.feedbackManager.showFeedback(
-                    `✅ FTP updated to ${newFtp} watt`,
+                    `✅ FTP updated to ${newFtp} W`,
                     "success"
                 );
             });
@@ -211,17 +267,17 @@ class SettingsManager {
 
         if (resetBtn) {
             resetBtn.addEventListener("click", () => {
-                window.storageManager.clearFtp();
+                window.storageManager.clearFTP();
 
-                const { ftp } = window.powerAnalysis.estimateFTP();
+                const { ftp } = window.powerAnalyzer.estimateFTP();
 
                 if (ftpInput) {
                     ftpInput.value = ftp;
                 }
 
-                const maxHRElement = document.getElementById("FTP");
-                if (maxHRElement) {
-                    maxHRElement.textContent = `${ftp} bpm`;
+                const ftpElement = document.getElementById("FTP");
+                if (ftpElement) {
+                    ftpElement.textContent = `${ftp} W`;
                 }
 
                 if (typeof window.analyze === "function") {
@@ -229,9 +285,63 @@ class SettingsManager {
                 }
 
                 window.feedbackManager.showFeedback(
-                    `✅ FTP reset to calculated value: ${ftp} bpm`,
+                    `✅ FTP reset to calculated value: ${ftp} W`,
                     "success"
                 );
+            });
+        }
+
+        if (scanBtn) {
+            scanBtn.addEventListener("click", () => {
+                const runs = window.dataProcessor.runs;
+
+                if (runs.length === 0) {
+                    window.feedbackManager.showError(
+                        "No activities loaded. Please upload a ZIP file or connect to Strava first."
+                    );
+                    return;
+                }
+
+                window.feedbackManager.showFeedback(
+                    "⏳ Scanning all rides for FTP estimation...",
+                    "info"
+                );
+
+                const { ftp, activity } = window.powerAnalyzer.estimateFTP();
+
+                if (ftp > 0) {
+                    window.storageManager.saveFTP(ftp);
+
+                    // Update input
+                    if (ftpInput) {
+                        ftpInput.value = ftp;
+                    }
+
+                    // Update display
+                    const ftpElement = document.getElementById("FTP");
+                    if (ftpElement) {
+                        ftpElement.textContent = `${ftp} W`;
+                    }
+
+                    // Re-analyze
+                    if (typeof window.analyze === "function") {
+                        window.analyze();
+                    }
+
+                    const activityDate = window.helpers.formatDateFull(
+                        activity.date
+                    );
+                    const activityDistance = activity.distance.toFixed(1);
+
+                    window.feedbackManager.showFeedback(
+                        `✅ FTP found: ${ftp} W (from ${activityDistance} km ride on ${activityDate})`,
+                        "success"
+                    );
+                } else {
+                    window.feedbackManager.showError(
+                        "No power data found in activities"
+                    );
+                }
             });
         }
     }
@@ -507,69 +617,6 @@ class SettingsManager {
     }
 
     /**
-     * Setup scan activities button
-     */
-    setupScanButton() {
-        const scanBtn = document.getElementById("scanActivitiesBtn");
-
-        if (scanBtn) {
-            scanBtn.addEventListener("click", () => {
-                const runs = window.dataProcessor.runs;
-
-                if (runs.length === 0) {
-                    window.feedbackManager.showError(
-                        "No activities loaded. Please upload a ZIP file or connect to Strava first."
-                    );
-                    return;
-                }
-
-                window.feedbackManager.showFeedback(
-                    "⏳ Scanning all activities for maximum HR...",
-                    "info"
-                );
-
-                const { maxHR, activity } =
-                    window.dataProcessor.calculateMaxHR();
-
-                if (maxHR > 0) {
-                    window.storageManager.saveHRMax(maxHR);
-
-                    // Update input
-                    const maxHrInput = document.getElementById("maxHrInput");
-                    if (maxHrInput) {
-                        maxHrInput.value = maxHR;
-                    }
-
-                    // Update display
-                    const maxHRElement = document.getElementById("maxHR");
-                    if (maxHRElement) {
-                        maxHRElement.textContent = `${maxHR} bpm`;
-                    }
-
-                    // Re-analyze
-                    if (typeof window.analyze === "function") {
-                        window.analyze();
-                    }
-
-                    const activityDate = window.helpers.formatDateFull(
-                        activity.date
-                    );
-                    const activityDistance = activity.distance.toFixed(1);
-
-                    window.feedbackManager.showFeedback(
-                        `✅ Max HR found: ${maxHR} bpm (from ${activityDistance} km run on ${activityDate})`,
-                        "success"
-                    );
-                } else {
-                    window.feedbackManager.showError(
-                        "No heart rate data found in activities"
-                    );
-                }
-            });
-        }
-    }
-
-    /**
      * Save chart ranges to localStorage
      */
     saveChartRanges(ranges) {
@@ -604,41 +651,6 @@ class SettingsManager {
         return this.loadChartRanges();
     }
 }
-
-// Save FTP
-document.getElementById("saveFtpBtn")?.addEventListener("click", () => {
-    const ftpInput = document.getElementById("ftpInput");
-    const ftp = parseInt(ftpInput.value);
-
-    if (ftp && ftp > 0 && ftp < 600) {
-        window.powerAnalyzer.setFTP(ftp);
-        window.storageManager.saveFTP(ftp);
-        window.feedbackManager.showStatus("FTP saved!", true);
-    } else {
-        window.feedbackManager.showStatus(
-            "Please enter a valid FTP (50-600W)",
-            false
-        );
-    }
-});
-
-// Scan rides for FTP
-document.getElementById("scanRidesBtn")?.addEventListener("click", () => {
-    const estimatedFTP = window.powerAnalyzer.estimateFTP();
-    if (estimatedFTP) {
-        document.getElementById("estimatedFTP").textContent =
-            `${estimatedFTP}W`;
-        window.feedbackManager.showStatus(
-            `FTP estimated: ${estimatedFTP}W`,
-            true
-        );
-    } else {
-        window.feedbackManager.showStatus(
-            "No power data available to estimate FTP",
-            false
-        );
-    }
-});
 
 // Initialize and export singleton
 window.settingsManager = new SettingsManager();

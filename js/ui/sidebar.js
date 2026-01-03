@@ -55,8 +55,6 @@ function initSidebar() {
         item.addEventListener("click", (e) => {
             e.preventDefault();
 
-            console.log("Nav item clicked!"); // Debug log
-
             const page = item.getAttribute("data-page");
             const sport = item.getAttribute("data-sport");
 
@@ -64,7 +62,7 @@ function initSidebar() {
             navigateToPage(page);
 
             // Then switch to the specific sport
-            if (sport && typeof switchSportType === "function") {
+            if (sport) {
                 setTimeout(() => {
                     switchSportType(sport);
                 }, 100);
@@ -77,79 +75,9 @@ function initSidebar() {
             item.classList.add("active");
 
             // Close mobile sidebar after navigation
-            console.log("Closing mobile sidebar..."); // Debug log
             closeMobileSidebar();
         });
     });
-
-    // Also handle regular nav items (without data-sport)
-    const regularNavItems = document.querySelectorAll(
-        ".nav-item:not([data-sport])"
-    );
-
-    regularNavItems.forEach((item) => {
-        item.addEventListener("click", (e) => {
-            const page = item.getAttribute("data-page");
-            if (page) {
-                e.preventDefault();
-
-                console.log("Regular nav item clicked!"); // Debug log
-
-                navigateToPage(page);
-
-                // Update active state
-                document.querySelectorAll(".nav-item").forEach((nav) => {
-                    nav.classList.remove("active");
-                });
-                item.classList.add("active");
-
-                // Close mobile sidebar after navigation
-                console.log("Closing mobile sidebar..."); // Debug log
-                closeMobileSidebar();
-            }
-        });
-    });
-
-    function switchSportType(sport) {
-        console.log("Switching to sport:", sport);
-
-        // Hide all sport analysis sections
-        document
-            .querySelectorAll(".sport-analysis-content")
-            .forEach((section) => {
-                section.style.display = "none";
-                section.classList.remove("active");
-            });
-
-        // Show the selected sport section
-        const sportSection = document.getElementById(`analysis-${sport}`);
-        if (sportSection) {
-            sportSection.style.display = "block";
-            sportSection.classList.add("active");
-        }
-
-        // Update active state on sport type buttons if they exist
-        document.querySelectorAll(".sport-type-button").forEach((btn) => {
-            btn.classList.remove("active");
-        });
-        const activeBtn = document.querySelector(
-            `.sport-type-button[data-sport="${sport}"]`
-        );
-        if (activeBtn) {
-            activeBtn.classList.add("active");
-        }
-
-        // Update sidebar active state
-        document.querySelectorAll(".nav-item[data-sport]").forEach((nav) => {
-            nav.classList.remove("active");
-        });
-        const activeSidebarItem = document.querySelector(
-            `.nav-item[data-sport="${sport}"]`
-        );
-        if (activeSidebarItem) {
-            activeSidebarItem.classList.add("active");
-        }
-    }
 
     // Close sidebar on escape key (mobile)
     document.addEventListener("keydown", function (e) {
@@ -181,6 +109,49 @@ function initSidebar() {
             }
         }, 250);
     });
+}
+
+// MOVED OUTSIDE initSidebar - now globally accessible
+function switchSportType(sport) {
+    console.log("Switching to sport:", sport);
+
+    // Hide all sport analysis sections
+    document.querySelectorAll(".sport-analysis-content").forEach((section) => {
+        section.style.display = "none";
+        section.classList.remove("active");
+    });
+
+    // Show the selected sport section
+    const sportSection = document.getElementById(`analysis-${sport}`);
+    if (sportSection) {
+        sportSection.style.display = "block";
+        sportSection.classList.add("active");
+    }
+
+    // Update active state on sport type buttons if they exist
+    document.querySelectorAll(".sport-type-button").forEach((btn) => {
+        btn.classList.remove("active");
+    });
+    const activeBtn = document.querySelector(
+        `.sport-type-button[data-sport="${sport}"]`
+    );
+    if (activeBtn) {
+        activeBtn.classList.add("active");
+    }
+
+    // Update sidebar active state
+    document.querySelectorAll(".nav-item[data-sport]").forEach((nav) => {
+        nav.classList.remove("active");
+    });
+    const activeSidebarItem = document.querySelector(
+        `.nav-item[data-sport="${sport}"]`
+    );
+    if (activeSidebarItem) {
+        activeSidebarItem.classList.add("active");
+    }
+
+    // Save current sport to localStorage
+    localStorage.setItem("lastVisitedSport", sport);
 }
 
 function openMobileSidebar() {
@@ -226,6 +197,9 @@ function navigateToPage(pageId) {
         }
     });
 
+    // Save current page to localStorage
+    localStorage.setItem("lastVisitedPage", pageId);
+
     // Update URL hash (optional, for bookmarking)
     window.location.hash = pageId;
 
@@ -246,13 +220,43 @@ function switchTab(tabName) {
     navigateToPage(pageId);
 }
 
-// Initialize on page load - check for hash
+// Initialize on page load - check for hash and restore state
 window.addEventListener("load", function () {
+    console.log("=== Page Load Started ===");
+
     const hash = window.location.hash.substring(1);
+    const lastSport = localStorage.getItem("lastVisitedSport");
+
+    console.log("URL Hash:", hash);
+    console.log("Last Sport from storage:", lastSport);
+
     if (hash) {
+        // If there's a hash, navigate to it
+        console.log("Navigating to hash:", hash);
         navigateToPage(hash);
+
+        // Restore sport type if on analysis page
+        if (hash === "page-analysis" && lastSport) {
+            console.log("Switching to saved sport:", lastSport);
+            setTimeout(() => {
+                switchSportType(lastSport);
+            }, 200);
+        }
+    } else if (lastSport) {
+        // If no hash but there's a saved sport, go to analysis with that sport
+        console.log(
+            "No hash, but found saved sport. Going to analysis page with sport:",
+            lastSport
+        );
+        navigateToPage("page-analysis");
+        setTimeout(() => {
+            switchSportType(lastSport);
+        }, 200);
     } else {
-        // Default to first page
+        // Default to upload page
+        console.log("No hash or saved sport, going to upload");
         navigateToPage("page-upload");
     }
+
+    console.log("=== Page Load Complete ===");
 });

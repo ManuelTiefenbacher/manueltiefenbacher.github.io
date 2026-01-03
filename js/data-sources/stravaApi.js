@@ -182,7 +182,7 @@ class StravaAPI {
         try {
             // Fetch all activities with pagination
             const allActivities = [];
-            const perPage = 25;
+            const perPage = 200;
             const maxPages = 1;
 
             for (let page = 1; page <= maxPages; page++) {
