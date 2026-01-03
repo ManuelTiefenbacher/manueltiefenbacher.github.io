@@ -637,48 +637,44 @@ class RunRenderer {
 
     createRunTooltip(run, classification, intervalInfo) {
         const { category, hrDataType, detailedHR } = classification;
-
         let html = '<div class="tooltip">';
-
         html += `
-      <div class="tooltip-row">
-        <span class="tooltip-label">Type:</span>
-        <span class="tooltip-value">${category}</span>
-      </div>
-      <div class="tooltip-row">
-        <span class="tooltip-label">Distance:</span>
-        <span class="tooltip-value">${(run.distance ?? 0).toFixed(2)} km</span>
-      </div>
-    `;
-
+  <div class="tooltip-row">
+    <span class="tooltip-label">Type:</span>
+    <span class="tooltip-value">${category}</span>
+  </div>
+  <div class="tooltip-row">
+    <span class="tooltip-label">Distance:</span>
+    <span class="tooltip-value">${(run.distance ?? 0).toFixed(2)} km</span>
+  </div>
+`;
         if (intervalInfo && intervalInfo.isInterval) {
             html += `
-        <div class="tooltip-row" style="background: rgba(251, 188, 4, 0.1); padding: 4px; border-radius: 4px; margin: 8px 0;">
-          <span class="tooltip-label">⚡ Intervals:</span>
-          <span class="tooltip-value">${intervalInfo.details}</span>
-        </div>
-      `;
+    <div class="tooltip-row" style="background: rgba(251, 188, 4, 0.1); padding: 4px; border-radius: 4px; margin: 8px 0;">
+      <span class="tooltip-label">⚡ Intervals:</span>
+      <span class="tooltip-value">${intervalInfo.details}</span>
+    </div>
+  `;
         }
-
         if (hrDataType === "none") {
             html += `
-        <div class="tooltip-row">
-          <span class="tooltip-label">HR Data:</span>
-          <span class="tooltip-value" style="color:#ea4335">Not available</span>
-        </div>
-      `;
+    <div class="tooltip-row">
+      <span class="tooltip-label">HR Data:</span>
+      <span class="tooltip-value" style="color:#ea4335">Not available</span>
+    </div>
+  `;
         } else if (hrDataType === "basic") {
             const zone = window.hrAnalyzer.getZone(run.avgHR);
             html += `
-        <div class="tooltip-row">
-          <span class="tooltip-label">Avg HR:</span>
-          <span class="tooltip-value">${run.avgHR} bpm (Zone ${zone})</span>
-        </div>
-        <div class="tooltip-row">
-          <span class="tooltip-label">Max HR:</span>
-          <span class="tooltip-value">${run.maxHR} bpm</span>
-        </div>
-      `;
+    <div class="tooltip-row">
+      <span class="tooltip-label">Avg HR:</span>
+      <span class="tooltip-value">${run.avgHR} bpm (Zone ${zone})</span>
+    </div>
+    <div class="tooltip-row">
+      <span class="tooltip-label">Max HR:</span>
+      <span class="tooltip-value">${run.maxHR} bpm</span>
+    </div>
+  `;
         } else if (hrDataType === "detailed" && detailedHR) {
             html +=
                 '<hr style="border:none;border-top:1px solid var(--border);margin:8px 0">';
@@ -687,36 +683,89 @@ class RunRenderer {
                 run.paceStream.pace
             );
 
-            html += `
-        <div class="tooltip-row">
-          <span class="tooltip-label">Time in Z1:</span>
-          <span class="tooltip-value">${detailedHR.percentZ1.toFixed(1)}%</span>
-        </div>
-        <div class="tooltip-row">
-          <span class="tooltip-label">Time in Z2:</span>
-          <span class="tooltip-value">${detailedHR.percentZ2.toFixed(1)}%</span>
-        </div>
-        <div class="tooltip-row">
-          <span class="tooltip-label">Time in Z3:</span>
-          <span class="tooltip-value">${detailedHR.percentZ3.toFixed(1)}%</span>
-        </div>
-        <div class="tooltip-row">
-          <span class="tooltip-label">Time in Z4:</span>
-          <span class="tooltip-value">${detailedHR.percentZ4.toFixed(1)}%</span>
-        </div>
-        <div class="tooltip-row">
-          <span class="tooltip-label">Time in Z5:</span>
-          <span class="tooltip-value">${detailedHR.percentZ5.toFixed(1)}%</span>
-        </div>
-        <div class="tooltip-row">
-          <span class="tooltip-label">Time in Z6:</span>
-          <span class="tooltip-value">${detailedHR.percentZ6.toFixed(1)}%</span>
-        </div>
-      `;
+            // Generate doughnut chart for zone distribution
+            html += this.generateZoneDoughnut(detailedHR);
         }
-
         html += "</div>";
         return html;
+    }
+
+    generateZoneDoughnut(detailedHR) {
+        const zones = [
+            { label: "Z1", percent: detailedHR.percentZ1, color: "#4285f4" },
+            { label: "Z2", percent: detailedHR.percentZ2, color: "#34a853" },
+            { label: "Z3", percent: detailedHR.percentZ3, color: "#fbbc04" },
+            { label: "Z4", percent: detailedHR.percentZ4, color: "#ff6d00" },
+            { label: "Z5", percent: detailedHR.percentZ5, color: "#ea4335" },
+            { label: "Z6", percent: detailedHR.percentZ6, color: "#9c27b0" },
+        ];
+
+        // Filter out zones with 0%
+        const activeZones = zones.filter((z) => z.percent > 0);
+
+        if (activeZones.length === 0) {
+            return '<div style="text-align:center;color:#666;padding:10px;">No zone data</div>';
+        }
+
+        // Calculate SVG path for doughnut
+        let cumulativePercent = 0;
+        const radius = 50;
+        const innerRadius = 35;
+        const cx = 60;
+        const cy = 60;
+
+        let paths = "";
+        activeZones.forEach((zone) => {
+            const startAngle =
+                (cumulativePercent / 100) * 2 * Math.PI - Math.PI / 2;
+            const endAngle =
+                ((cumulativePercent + zone.percent) / 100) * 2 * Math.PI -
+                Math.PI / 2;
+
+            const x1 = cx + radius * Math.cos(startAngle);
+            const y1 = cy + radius * Math.sin(startAngle);
+            const x2 = cx + radius * Math.cos(endAngle);
+            const y2 = cy + radius * Math.sin(endAngle);
+
+            const ix1 = cx + innerRadius * Math.cos(startAngle);
+            const iy1 = cy + innerRadius * Math.sin(startAngle);
+            const ix2 = cx + innerRadius * Math.cos(endAngle);
+            const iy2 = cy + innerRadius * Math.sin(endAngle);
+
+            const largeArc = zone.percent > 50 ? 1 : 0;
+
+            paths += `
+            <path d="M ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2} 
+                     L ${ix2} ${iy2} A ${innerRadius} ${innerRadius} 0 ${largeArc} 0 ${ix1} ${iy1} Z"
+                  fill="${zone.color}" stroke="none"/>
+        `;
+
+            cumulativePercent += zone.percent;
+        });
+
+        // Generate legend
+        let legend =
+            '<div style="display:flex;flex-direction:column;gap:6px;">';
+        activeZones.forEach((zone) => {
+            legend += `
+            <div style="display:flex;align-items:center;gap:6px;font-size:12px;">
+                <div style="width:12px;height:12px;border-radius:2px;background:${zone.color};flex-shrink:0;"></div>
+                <span style="white-space:nowrap;">${zone.label}: ${zone.percent.toFixed(1)}%</span>
+            </div>
+        `;
+        });
+        legend += "</div>";
+
+        return `
+        <div style="margin-top:12px;display:flex;align-items:center;gap:16px;justify-content:center;">
+            <div style="flex-shrink:0;">
+                <svg width="120" height="120" viewBox="0 0 120 120">
+                    ${paths}
+                </svg>
+            </div>
+            ${legend}
+        </div>
+    `;
     }
 
     /* ---------------- Training load ---------------- */

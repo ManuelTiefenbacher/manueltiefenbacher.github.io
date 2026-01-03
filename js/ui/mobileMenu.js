@@ -1,55 +1,58 @@
-// Mobile Burger Menu Functionality
+// Mobile Sidebar Functionality
 document.addEventListener("DOMContentLoaded", function () {
-    // Create burger menu button
-    const header = document.querySelector("header");
-    const tabNav = document.querySelector(".tab-nav");
+    const sidebar = document.querySelector(".sidebar");
+    const sidebarOverlay = document.querySelector(".sidebar-overlay");
+    const mobileSidebarToggle = document.querySelector(
+        ".mobile-sidebar-toggle"
+    );
+    const sidebarToggle = document.querySelector(".sidebar-toggle");
 
-    if (header && tabNav && window.innerWidth <= 480) {
-        // Create burger button
-        const burgerBtn = document.createElement("button");
-        burgerBtn.className = "mobile-menu-toggle";
-        burgerBtn.setAttribute("aria-label", "Toggle menu");
-        burgerBtn.innerHTML = `
-            <span></span>
-            <span></span>
-            <span></span>
-        `;
+    if (!sidebar || !mobileSidebarToggle) return;
 
-        header.appendChild(burgerBtn);
+    // Toggle sidebar on mobile button click
+    mobileSidebarToggle.addEventListener("click", function (e) {
+        e.stopPropagation();
+        sidebar.classList.toggle("mobile-open");
+        if (sidebarOverlay) sidebarOverlay.classList.toggle("active");
+        document.body.style.overflow = sidebar.classList.contains("mobile-open")
+            ? "hidden"
+            : "";
+    });
 
-        // Toggle menu on click
-        burgerBtn.addEventListener("click", function () {
-            this.classList.toggle("active");
-            tabNav.classList.toggle("mobile-open");
-            document.body.style.overflow = tabNav.classList.contains(
-                "mobile-open"
-            )
-                ? "hidden"
-                : "";
+    // Desktop sidebar toggle (collapse/expand)
+    if (sidebarToggle) {
+        sidebarToggle.addEventListener("click", function (e) {
+            e.stopPropagation();
+            sidebar.classList.toggle("collapsed");
         });
+    }
 
-        // Close menu when tab is clicked
-        const tabButtons = document.querySelectorAll(".tab-button");
-        tabButtons.forEach((button) => {
-            button.addEventListener("click", function () {
-                burgerBtn.classList.remove("active");
-                tabNav.classList.remove("mobile-open");
-                document.body.style.overflow = "";
-            });
-        });
+    // Close sidebar when any nav-item is clicked
+    const navItems = document.querySelectorAll(".nav-item");
+    navItems.forEach((item) => {
+        item.addEventListener("click", function (e) {
+            console.log("Nav item clicked:", this); // Debug log
 
-        // Close menu on escape key
-        document.addEventListener("keydown", function (e) {
+            // Close mobile menu when navigation happens
             if (
-                e.key === "Escape" &&
-                tabNav.classList.contains("mobile-open")
+                window.innerWidth <= 768 &&
+                sidebar.classList.contains("mobile-open")
             ) {
-                burgerBtn.classList.remove("active");
-                tabNav.classList.remove("mobile-open");
+                sidebar.classList.remove("mobile-open");
+                if (sidebarOverlay) sidebarOverlay.classList.remove("active");
                 document.body.style.overflow = "";
             }
         });
-    }
+    });
+
+    // Close sidebar on escape key
+    document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && sidebar.classList.contains("mobile-open")) {
+            sidebar.classList.remove("mobile-open");
+            if (sidebarOverlay) sidebarOverlay.classList.remove("active");
+            document.body.style.overflow = "";
+        }
+    });
 });
 
 // Handle window resize
@@ -57,19 +60,14 @@ let resizeTimer;
 window.addEventListener("resize", function () {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(function () {
-        const burgerBtn = document.querySelector(".mobile-menu-toggle");
-        const tabNav = document.querySelector(".tab-nav");
+        const sidebar = document.querySelector(".sidebar");
+        const sidebarOverlay = document.querySelector(".sidebar-overlay");
 
-        if (window.innerWidth > 480) {
-            // Desktop view - remove mobile menu
-            if (burgerBtn) burgerBtn.remove();
-            if (tabNav) {
-                tabNav.classList.remove("mobile-open");
-                document.body.style.overflow = "";
-            }
-        } else if (window.innerWidth <= 480 && !burgerBtn) {
-            // Mobile view - add burger menu if it doesn't exist
-            location.reload(); // Simplest way to reinitialize
+        if (window.innerWidth > 768) {
+            // Desktop view - ensure mobile classes are removed
+            if (sidebar) sidebar.classList.remove("mobile-open");
+            if (sidebarOverlay) sidebarOverlay.classList.remove("active");
+            document.body.style.overflow = "";
         }
     }, 250);
 });

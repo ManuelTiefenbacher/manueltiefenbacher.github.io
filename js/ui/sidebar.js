@@ -55,6 +55,8 @@ function initSidebar() {
         item.addEventListener("click", (e) => {
             e.preventDefault();
 
+            console.log("Nav item clicked!"); // Debug log
+
             const page = item.getAttribute("data-page");
             const sport = item.getAttribute("data-sport");
 
@@ -73,6 +75,10 @@ function initSidebar() {
                 nav.classList.remove("active");
             });
             item.classList.add("active");
+
+            // Close mobile sidebar after navigation
+            console.log("Closing mobile sidebar..."); // Debug log
+            closeMobileSidebar();
         });
     });
 
@@ -86,6 +92,9 @@ function initSidebar() {
             const page = item.getAttribute("data-page");
             if (page) {
                 e.preventDefault();
+
+                console.log("Regular nav item clicked!"); // Debug log
+
                 navigateToPage(page);
 
                 // Update active state
@@ -93,6 +102,10 @@ function initSidebar() {
                     nav.classList.remove("active");
                 });
                 item.classList.add("active");
+
+                // Close mobile sidebar after navigation
+                console.log("Closing mobile sidebar..."); // Debug log
+                closeMobileSidebar();
             }
         });
     });
