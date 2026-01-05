@@ -551,6 +551,21 @@ class RunRenderer {
       ${tooltip}
     `;
 
+        // Add touch support for mobile
+        if ("ontouchstart" in window) {
+            el.addEventListener("touchstart", (e) => {
+                const tooltip = el.querySelector(".tooltip");
+                if (tooltip) {
+                    tooltip.style.display =
+                        tooltip.style.display === "block" ? "none" : "block";
+                    // Close other tooltips
+                    document.querySelectorAll(".tooltip").forEach((t) => {
+                        if (t !== tooltip) t.style.display = "none";
+                    });
+                }
+            });
+        }
+
         return el;
     }
 

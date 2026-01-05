@@ -176,11 +176,6 @@
         margin-top: 6px; 
     }
 
-    /* Tooltips: hide on mobile for clarity */
-    .tooltip { 
-        display: none !important; 
-    }
-
     /* Comparison view adjustments */
     .comparison-header { 
         display: none; 
