@@ -58,7 +58,6 @@ class RideRenderer {
 
     calculateDaysSinceRest() {
         const list = window.dataProcessor?.rides;
-
         if (!Array.isArray(list) || list.length === 0) return "—";
 
         const sorted = [...list].sort((a, b) => b.date - a.date);
@@ -74,7 +73,6 @@ class RideRenderer {
             const current = sorted[i];
             const next = sorted[i + 1];
             const gapDays = window.helpers.daysBetween(next.date, current.date);
-
             if (gapDays > 1) {
                 consecutiveDays = i + 1;
                 break;
@@ -91,7 +89,6 @@ class RideRenderer {
             const s = window.dataProcessor.getSummaryRides();
             avgWeekly = s?.last6Months?.avgWeekly ?? 0;
         }
-
         this.renderAverageDistanceChart(activities || [], Number(avgWeekly));
         this.renderIntensityChart(activities || []);
     }
@@ -180,18 +177,25 @@ class RideRenderer {
             },
             {
                 type: "line",
-                label: "Avg Speed (km/h)",
-                data: weeklyData.map((w) => w.avgSpeed),
+                label: "Estimated FTP (W)",
+                data: weeklyData.map((w) => w.estimatedFTP),
                 borderColor: "rgba(251, 188, 4, 1)",
                 backgroundColor: "rgba(251, 188, 4, 0.1)",
-                borderWidth: 1,
-                pointRadius: 3,
+                borderWidth: 2,
+                pointRadius: 4,
                 pointBackgroundColor: "rgba(251, 188, 4, 1)",
                 fill: false,
                 yAxisID: "y2",
                 tension: 0.3,
+                spanGaps: true,
             },
         ];
+
+        const ftpValues = weeklyData
+            .map((w) => w.estimatedFTP)
+            .filter((v) => v !== null);
+        const maxFTP = ftpValues.length > 0 ? Math.max(...ftpValues) : 300;
+        const suggestedMaxFTP = Math.ceil((maxFTP + 20) / 50) * 50;
 
         this.chart = new Chart(canvas, {
             type: "bar",
@@ -199,10 +203,7 @@ class RideRenderer {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                interaction: {
-                    mode: "index",
-                    intersect: false,
-                },
+                interaction: { mode: "index", intersect: false },
                 plugins: {
                     legend: {
                         display: true,
@@ -218,11 +219,9 @@ class RideRenderer {
                                 const label = context.dataset.label || "";
                                 const value = context.parsed.y;
                                 if (value === 0 || value === null) return null;
-
-                                if (label === "Avg Speed (km/h)") {
-                                    return `${label}: ${value.toFixed(1)} km/h`;
+                                if (label === "Estimated FTP (W)") {
+                                    return `${label}: ${Math.round(value)}W`;
                                 }
-
                                 return `${label}: ${value.toFixed(1)} km`;
                             },
                             footer: (tooltipItems) => {
@@ -255,19 +254,15 @@ class RideRenderer {
                         beginAtZero: true,
                         title: {
                             display: true,
-                            text: "Speed (km/h)",
+                            text: "FTP (Watts)",
                             color: "#fbbc04",
                         },
                         ticks: {
                             color: "#fbbc04",
-                            callback: (value) => `${value.toFixed(1)}`,
+                            callback: (value) => `${Math.round(value)}W`,
                         },
-                        grid: {
-                            drawOnChartArea: false, // Prevents grid lines from overlapping with y-axis
-                        },
-                        suggestedMax: Math.ceil(
-                            Math.max(...weeklyData.map((w) => w.avgSpeed)) + 2
-                        ),
+                        grid: { drawOnChartArea: false },
+                        suggestedMax: suggestedMaxFTP,
                     },
                     x: {
                         stacked: true,
@@ -300,6 +295,8 @@ class RideRenderer {
                     noPower: 0,
                     speeds: [],
                     totalDuration: 0,
+                    ftpEstimates: [],
+                    ridesWithPower: [],
                 });
             }
 
@@ -308,11 +305,29 @@ class RideRenderer {
             weekData.totalDuration += activity.duration || 0;
 
             const avgSpeed = window.helpers.calculateAverageSpeed(activity);
-            if (avgSpeed) {
-                weekData.speeds.push(avgSpeed);
+            if (avgSpeed) weekData.speeds.push(avgSpeed);
+
+            if (
+                activity.powerStream &&
+                activity.powerStream.watts &&
+                activity.powerStream.watts.length > 300
+            ) {
+                weekData.ridesWithPower.push(activity);
+
+                let ftpEstimate = window.powerAnalyzer.estimateFTPFrom20Min(
+                    activity.powerStream
+                );
+                if (!ftpEstimate || ftpEstimate === 0) {
+                    ftpEstimate = window.powerAnalyzer.estimateFTPFrom5Min(
+                        activity.powerStream
+                    );
+                }
+                if (ftpEstimate && ftpEstimate > 0) {
+                    weekData.ftpEstimates.push(ftpEstimate);
+                }
             }
 
-            const hasPowerData = activity.avgWatts || activity.powerStream;
+            const hasPowerData = activity.powerStream;
 
             if (!hasPowerData) {
                 weekData.noPower += activity.distance || 0;
@@ -320,7 +335,6 @@ class RideRenderer {
                 activity.powerStream &&
                 activity.powerStream.watts.length > 0
             ) {
-                // Detailed power analysis
                 const analysis = this.analyzePowerStream(
                     activity.powerStream,
                     ftp
@@ -339,13 +353,10 @@ class RideRenderer {
                     weekData.z6 +=
                         (activity.distance || 0) * (analysis.percentZ6 / 100);
                 }
-            } else if (activity.avgWatts) {
-                // Basic power zone based on average
+            } else if (activity.avgPower) {
                 const zone = this.getPowerZone(activity.avgWatts, ftp);
                 const zoneKey = `z${zone}`;
                 weekData[zoneKey] += activity.distance || 0;
-            } else {
-                console.log("No Power over timeline chart created");
             }
         });
 
@@ -356,6 +367,10 @@ class RideRenderer {
                     ? week.speeds.reduce((sum, s) => sum + s, 0) /
                       week.speeds.length
                     : null,
+            estimatedFTP:
+                week.ftpEstimates.length > 0
+                    ? Math.max(...week.ftpEstimates)
+                    : null,
         }));
 
         return result.sort((a, b) => a.weekStart - b.weekStart);
@@ -364,13 +379,12 @@ class RideRenderer {
     getPowerZone(watts, ftp) {
         if (!ftp || ftp === 0) return 1;
         const percent = (watts / ftp) * 100;
-
-        if (percent < 55) return 1; // Active Recovery
-        if (percent < 75) return 2; // Endurance
-        if (percent < 90) return 3; // Tempo
-        if (percent < 105) return 4; // Threshold
-        if (percent < 120) return 5; // VO2 Max
-        return 6; // Anaerobic
+        if (percent < 55) return 1;
+        if (percent < 75) return 2;
+        if (percent < 90) return 3;
+        if (percent < 105) return 4;
+        if (percent < 120) return 5;
+        return 6;
     }
 
     analyzePowerStream(powerStream, ftp) {
@@ -378,7 +392,6 @@ class RideRenderer {
             return null;
 
         const zones = { z1: 0, z2: 0, z3: 0, z4: 0, z5: 0, z6: 0 };
-
         powerStream.watts.forEach((watts) => {
             const zone = this.getPowerZone(watts, ftp);
             zones[`z${zone}`]++;
@@ -554,7 +567,6 @@ class RideRenderer {
                     activity.powerStream,
                     ftp
                 );
-
                 if (analysis && activity.distance) {
                     distances.z1 +=
                         (activity.distance * analysis.percentZ1) / 100;
@@ -586,7 +598,6 @@ class RideRenderer {
     renderTimeline(activities) {
         const div = document.getElementById("timelineRide");
         if (!div) return;
-
         div.innerHTML = "";
 
         const recent = (activities || []).filter(
@@ -616,25 +627,38 @@ class RideRenderer {
         );
 
         let badges = "";
-
         if (intervalInfo.isInterval) {
             badges += '<span class="badge interval-badge">⚡ Interval</span>';
         }
-
         if (powerDataType === "none") {
             badges += '<span class="badge no-power">No Power</span>';
         } else if (powerDataType === "basic") {
             badges += '<span class="badge basic-power">Basic Power</span>';
         }
-        /*if (isLong) {
-            badges += '<span class="badge long-ride">Long Ride</span>';
-        }*/
 
         el.innerHTML = `
       <span>${window.helpers.formatDateFull(ride.date)} — ${category}</span>
       <span>${badges}<span class="badge">${(ride.distance ?? 0).toFixed(1)} km</span></span>
       ${tooltip}
     `;
+
+        // Improve tooltip hover behavior
+        setTimeout(() => {
+            const tooltipEl = el.querySelector(".tooltip");
+            if (tooltipEl) {
+                el.addEventListener("mouseleave", (e) => {
+                    const toElement = e.relatedTarget;
+                    if (toElement && tooltipEl.contains(toElement)) {
+                        return;
+                    }
+                    tooltipEl.style.pointerEvents = "auto";
+                });
+
+                tooltipEl.addEventListener("mouseenter", () => {
+                    tooltipEl.style.pointerEvents = "auto";
+                });
+            }
+        }, 0);
 
         return el;
     }
@@ -680,30 +704,64 @@ class RideRenderer {
       `;
         }
 
-        // Heart Rate Section
-        if (hrDataType === "detailed" && detailedHR) {
+        // Combined graph section
+        const hasDetailedHR = hrDataType === "detailed" && detailedHR;
+        const hasDetailedPower = powerDataType === "detailed" && detailedPower;
+
+        if (hasDetailedHR || hasDetailedPower) {
             html +=
                 '<hr style="border:none;border-top:1px solid var(--border);margin:8px 0">';
 
-            // Generate HR+Power graph if both are available
+            // Always show graph when detailed data is available
             if (
-                powerDataType === "detailed" &&
-                detailedPower &&
-                ride.powerStream
+                hasDetailedHR &&
+                hasDetailedPower &&
+                ride.powerStream &&
+                ride.hrStream
             ) {
+                // Combined HR+Power graph
                 html += this.generateHRPowerGraph(
                     ride.hrStream,
                     ride.powerStream
                 );
-            } else {
+            } else if (hasDetailedHR && ride.hrStream) {
                 // Just HR graph without power
                 html += window.hrAnalyzer.generateHRGraph(detailedHR.hrRecords);
+            } else if (hasDetailedPower && ride.powerStream) {
+                // Just power graph without HR
+                html += this.generatePowerGraph(ride.powerStream);
             }
 
-            html +=
-                '<div style="font-weight:600;margin:16px 0 8px 0;">Heart Rate Distribution</div>';
-            html += this.generateHRZoneDoughnut(detailedHR);
-        } else if (hrDataType === "basic") {
+            // Display doughnuts side by side if both exist
+            if (hasDetailedHR && hasDetailedPower) {
+                html +=
+                    '<div style="font-weight:600;margin:16px 0 8px 0;">Zone Distribution</div>';
+                html +=
+                    '<div style="display:flex;gap:24px;justify-content:center;flex-wrap:wrap;">';
+                html += '<div style="flex:1;min-width:250px;max-width:400px;">';
+                html +=
+                    '<div style="font-weight:600;margin-bottom:8px;text-align:center;color:#ea4335;">Heart Rate</div>';
+                html += this.generateHRZoneDoughnut(detailedHR);
+                html += "</div>";
+                html += '<div style="flex:1;min-width:250px;max-width:400px;">';
+                html +=
+                    '<div style="font-weight:600;margin-bottom:8px;text-align:center;color:#4285f4;">Power</div>';
+                html += this.generatePowerZoneDoughnut(detailedPower);
+                html += "</div>";
+                html += "</div>";
+            } else if (hasDetailedHR) {
+                html +=
+                    '<div style="font-weight:600;margin:16px 0 8px 0;">Heart Rate Distribution</div>';
+                html += this.generateHRZoneDoughnut(detailedHR);
+            } else if (hasDetailedPower) {
+                html +=
+                    '<div style="font-weight:600;margin:16px 0 8px 0;">Power Distribution</div>';
+                html += this.generatePowerZoneDoughnut(detailedPower);
+            }
+        }
+
+        // Basic HR data
+        if (hrDataType === "basic") {
             const zone = window.hrAnalyzer?.getZone(ride.avgHR) || "?";
             html += `
         <div class="tooltip-row">
@@ -724,21 +782,8 @@ class RideRenderer {
       `;
         }
 
-        // Power Section
-        if (powerDataType === "detailed" && detailedPower) {
-            // Only show separator if HR graph wasn't already shown
-                html +=
-                    '<hr style="border:none;border-top:1px solid var(--border);margin:8px 0">';
-
-                // Show power graph if HR graph wasn't shown
-                if (ride.powerStream) {
-                    html += this.generatePowerGraph(ride.powerStream);
-                }
-
-            html +=
-                '<div style="font-weight:600;margin:16px 0 8px 0;">Power Distribution</div>';
-            html += this.generatePowerZoneDoughnut(detailedPower);
-        } else if (powerDataType === "basic") {
+        // Basic Power data
+        if (powerDataType === "basic") {
             const ftp = window.powerAnalyzer.getFTP() ?? 0;
             const zone = this.getPowerZone(ride.avgWatts, ftp);
             html += `
@@ -751,7 +796,7 @@ class RideRenderer {
           <span class="tooltip-value">${ride.maxWatts} W</span>
         </div>
       `;
-        } else if (powerDataType === "none") {
+        } else if (powerDataType === "none" && hrDataType !== "none") {
             html += `
         <div class="tooltip-row">
           <span class="tooltip-label">Power Data:</span>
@@ -766,16 +811,39 @@ class RideRenderer {
 
     generateHRZoneDoughnut(detailedHR) {
         const zones = [
-            { label: "Z1", percent: detailedHR.percentZ1, color: "#4285f4" },
-            { label: "Z2", percent: detailedHR.percentZ2, color: "#34a853" },
-            { label: "Z3", percent: detailedHR.percentZ3, color: "#fbbc04" },
-            { label: "Z4", percent: detailedHR.percentZ4, color: "#ff6d00" },
-            { label: "Z5", percent: detailedHR.percentZ5, color: "#ea4335" },
-            { label: "Z6", percent: detailedHR.percentZ6, color: "#9c27b0" },
+            {
+                label: "Z1",
+                percent: detailedHR.percentZ1,
+                color: "rgba(189, 189, 189, 0.8)",
+            },
+            {
+                label: "Z2",
+                percent: detailedHR.percentZ2,
+                color: "rgba(66, 133, 244, 0.8)",
+            },
+            {
+                label: "Z3",
+                percent: detailedHR.percentZ3,
+                color: "rgba(52, 168, 83, 0.8)",
+            },
+            {
+                label: "Z4",
+                percent: detailedHR.percentZ4,
+                color: "rgba(255, 153, 0, 0.8)",
+            },
+            {
+                label: "Z5",
+                percent: detailedHR.percentZ5,
+                color: "rgba(234, 67, 53, 0.8)",
+            },
+            {
+                label: "Z6",
+                percent: detailedHR.percentZ6,
+                color: "rgba(156, 39, 176, 0.8)",
+            },
         ];
 
         const activeZones = zones.filter((z) => z.percent > 0);
-
         if (activeZones.length === 0) {
             return '<div style="text-align:center;color:#666;padding:10px;">No zone data</div>';
         }
@@ -841,16 +909,39 @@ class RideRenderer {
 
     generatePowerZoneDoughnut(detailedPower) {
         const zones = [
-            { label: "Z1", percent: detailedPower.percentZ1, color: "#bdbdbd" },
-            { label: "Z2", percent: detailedPower.percentZ2, color: "#4285f4" },
-            { label: "Z3", percent: detailedPower.percentZ3, color: "#34a853" },
-            { label: "Z4", percent: detailedPower.percentZ4, color: "#ff9900" },
-            { label: "Z5", percent: detailedPower.percentZ5, color: "#ea4335" },
-            { label: "Z6", percent: detailedPower.percentZ6, color: "#9c27b0" },
+            {
+                label: "Z1",
+                percent: detailedPower.percentZ1,
+                color: "rgba(189, 189, 189, 0.8)",
+            },
+            {
+                label: "Z2",
+                percent: detailedPower.percentZ2,
+                color: "rgba(66, 133, 244, 0.8)",
+            },
+            {
+                label: "Z3",
+                percent: detailedPower.percentZ3,
+                color: "rgba(52, 168, 83, 0.8)",
+            },
+            {
+                label: "Z4",
+                percent: detailedPower.percentZ4,
+                color: "rgba(255, 153, 0, 0.8)",
+            },
+            {
+                label: "Z5",
+                percent: detailedPower.percentZ5,
+                color: "rgba(234, 67, 53, 0.8)",
+            },
+            {
+                label: "Z6",
+                percent: detailedPower.percentZ6,
+                color: "rgba(156, 39, 176, 0.8)",
+            },
         ];
 
         const activeZones = zones.filter((z) => z.percent > 0);
-
         if (activeZones.length === 0) {
             return '<div style="text-align:center;color:#666;padding:10px;">No zone data</div>';
         }
@@ -915,9 +1006,13 @@ class RideRenderer {
     }
 
     generateHRPowerGraph(hrStream, powerStream) {
-        if (!hrStream || !hrStream.hr || !powerStream || !powerStream.watts) {
+        if (
+            !hrStream ||
+            !hrStream.heartrate ||
+            !powerStream ||
+            !powerStream.watts
+        )
             return "";
-        }
 
         const getGraphWidth = () => {
             const screenWidth =
@@ -929,36 +1024,62 @@ class RideRenderer {
         };
 
         const width = getGraphWidth();
-        const height = 200;
-
+        const height = 220;
         const zones = window.dataProcessor.getZonesBPM();
         const hrMax = window.dataProcessor.hrMax;
-
         const ftp = window.powerAnalyzer.getFTP();
+
         const padding = 30;
         const topPadding = 80;
         const rightPadding = 50;
+        const bottomPadding = 20;
         const graphWidth = width - padding - rightPadding;
-        const graphHeight = height - topPadding - padding;
+        const graphHeight = height - topPadding - bottomPadding;
 
-        // Sample data
-        let sampledHR = hrStream.hr;
+        // Sampling-aware time (1 Hz fallback)
+        const originalLen = Math.min(
+            hrStream.heartrate.length,
+            powerStream.watts.length
+        );
+        const step = originalLen > 200 ? Math.ceil(originalLen / 200) : 1;
+
+        let sampledHR = hrStream.heartrate;
         let sampledWatts = powerStream.watts;
-
-        if (hrStream.hr.length > 200) {
-            const step = Math.ceil(hrStream.hr.length / 200);
-            sampledHR = hrStream.hr.filter((_, i) => i % step === 0);
+        if (step > 1) {
+            sampledHR = hrStream.heartrate.filter((_, i) => i % step === 0);
             sampledWatts = powerStream.watts.filter((_, i) => i % step === 0);
         }
 
+        const timeArr = Array.isArray(hrStream.time)
+            ? hrStream.time
+            : Array.isArray(powerStream.time)
+              ? powerStream.time
+              : null;
+        const hz = hrStream.hz || powerStream.hz || 1;
+
+        let totalSeconds, secondsForIndex;
+        if (timeArr && timeArr.length >= originalLen) {
+            const t0 = timeArr[0],
+                t1 = timeArr[originalLen - 1];
+            totalSeconds = Math.max(0, t1 - t0);
+            secondsForIndex = (i) =>
+                timeArr[Math.min(originalLen - 1, i * step)] - t0;
+        } else {
+            totalSeconds = originalLen / hz;
+            secondsForIndex = (i) => (i * step) / hz;
+        }
+
+        const xForIndex = (i) =>
+            padding + (i / (sampledHR.length - 1)) * graphWidth;
+
+        // HR scaling
         const minHR = Math.max(Math.min(...sampledHR) - 10, 100);
         const maxHR = hrMax + 10;
         const hrRange = maxHR - minHR;
 
-        // HR line path
         const hrPathData = sampledHR
             .map((hr, i) => {
-                const x = padding + (i / (sampledHR.length - 1)) * graphWidth;
+                const x = xForIndex(i);
                 const y =
                     topPadding +
                     graphHeight -
@@ -967,7 +1088,7 @@ class RideRenderer {
             })
             .join(" ");
 
-        // Power line path
+        // Power scaling
         const validWatts = sampledWatts.filter((w) => w >= 0 && w < 2000);
         const minWatts = 0;
         const maxWatts = Math.max(...validWatts, ftp * 1.5);
@@ -977,8 +1098,7 @@ class RideRenderer {
         const powerPathData = sampledWatts
             .map((watts, i) => {
                 if (watts < 0 || watts > 2000) return null;
-                const x =
-                    padding + (i / (sampledWatts.length - 1)) * graphWidth;
+                const x = xForIndex(i);
                 const y =
                     topPadding +
                     graphHeight -
@@ -986,11 +1106,11 @@ class RideRenderer {
                     powerOffset;
                 return `${x} ${y}`;
             })
-            .filter((p) => p !== null)
-            .map((point, i) => `${i === 0 ? "M" : "L"} ${point}`)
+            .filter(Boolean)
+            .map((pt, i) => `${i === 0 ? "M" : "L"} ${pt}`)
             .join(" ");
 
-        // Power grid lines
+        // Power guides
         const powerMarkers = [0, 100, 200, 300, 400, 500].filter(
             (w) => w <= maxWatts
         );
@@ -1001,11 +1121,9 @@ class RideRenderer {
                     graphHeight -
                     ((watts - minWatts) / wattsRange) * graphHeight -
                     powerOffset;
-                return `<line x1="${padding}" y1="${y}" x2="${padding + graphWidth}" y2="${y}" 
-                      stroke="#4285f4" stroke-width="2" stroke-dasharray="1,0.5" opacity="0.4" />`;
+                return `<line x1="${padding}" y1="${y}" x2="${padding + graphWidth}" y2="${y}" stroke="#4285f4" stroke-width="2" stroke-dasharray="1,0.5" opacity="0.4" />`;
             })
             .join("");
-
         const powerAxisLabels = powerMarkers
             .map((watts) => {
                 const y =
@@ -1017,18 +1135,16 @@ class RideRenderer {
             })
             .join("");
 
-        // HR Zone backgrounds
+        // HR zones
         const zoneConfig = [
             { upper: zones.z2Upper, color: "rgba(52, 168, 83, 0.1)" },
             { upper: zones.z3Upper, color: "rgba(251, 188, 4, 0.1)" },
             { upper: zones.z4Upper, color: "rgba(255, 153, 0, 0.1)" },
             { upper: zones.z5Upper, color: "rgba(234, 67, 53, 0.1)" },
         ];
-
-        let zoneRects = "";
-        let zoneLines = "";
-        let prevY = topPadding + graphHeight;
-
+        let zoneRects = "",
+            zoneLines = "",
+            prevY = topPadding + graphHeight;
         zoneConfig.forEach((zone) => {
             if (zone.upper >= minHR && zone.upper <= maxHR) {
                 const y =
@@ -1042,175 +1158,218 @@ class RideRenderer {
             }
         });
 
+        // X-axis ticks
+        const tickInterval = (function chooseTimeTickInterval(totalSeconds) {
+            const candidates = [
+                10, 15, 30, 60, 120, 180, 300, 600, 900, 1200, 1800, 3600,
+            ];
+            for (const c of candidates) {
+                const n = Math.floor(totalSeconds / c);
+                if (n >= 5 && n <= 8) return c;
+            }
+            return Math.max(10, Math.round(totalSeconds / 6));
+        })(totalSeconds);
+
+        const timeTicks = [];
+        for (
+            let t = 0;
+            t <= totalSeconds + 0.5 * tickInterval;
+            t += tickInterval
+        ) {
+            const ratio = Math.min(1, t / totalSeconds);
+            const x = padding + ratio * graphWidth;
+            timeTicks.push({ x, label: formatMMSS(t) });
+        }
+        const xAxisTicks = timeTicks
+            .map(
+                ({ x }) =>
+                    `<line x1="${x}" y1="${topPadding + graphHeight}" x2="${x}" y2="${topPadding + graphHeight + 5}" stroke="#9aa0a6" stroke-width="1" />`
+            )
+            .join("");
+        const xAxisLabels = timeTicks
+            .map(({ x, label }) => {
+                let anchor = "middle";
+                if (x <= padding + 2) anchor = "start";
+                if (x >= padding + graphWidth - 2) anchor = "end";
+                return `<text x="${x}" y="${topPadding + graphHeight + 16}" text-anchor="${anchor}" font-size="11" fill="#9aa0a6">${label}</text>`;
+            })
+            .join("");
+
         const graphId = "graph-" + Math.random().toString(36).substr(2, 9);
         const dataPoints = sampledHR
             .map((hr, i) => `${hr}|${sampledWatts[i] || 0}`)
             .join(",");
 
-        return `
-  <svg id="${graphId}" width="${width}" height="${height}" style="display: block; margin: 0 auto; cursor: crosshair; max-width: 100%;" data-points="${dataPoints}">
-    <defs>
-      <filter id="shadow-${graphId}">
-        <feDropShadow dx="0" dy="1" stdDeviation="2" flood-opacity="0.3"/>
-      </filter>
-    </defs>
-    ${zoneRects}
-    ${zoneLines}
-    ${powerGridLines}
-    <path d="${powerPathData}" fill="none" stroke="#4285f4" stroke-width="2.5" opacity="0.9" />
-    <path d="${hrPathData}" fill="none" stroke="#ea4335" stroke-width="2.5" />
-    
-    <line id="cursor-${graphId}" x1="0" y1="${topPadding}" x2="0" y2="${topPadding + graphHeight}" 
-          stroke="#666" stroke-width="1.5" opacity="0" pointer-events="none" />
-    
-    <circle id="cursor-hr-${graphId}" cx="0" cy="0" r="5" fill="#ea4335" stroke="white" 
-            stroke-width="2" opacity="0" pointer-events="none" filter="url(#shadow-${graphId})" />
-    
-    <circle id="cursor-power-${graphId}" cx="0" cy="0" r="5" fill="#4285f4" stroke="white" 
-            stroke-width="2" opacity="0" pointer-events="none" filter="url(#shadow-${graphId})" />
-    
-    <rect id="tooltip-bg-${graphId}" x="0" y="0" width="120" height="70" rx="6" 
-          fill="rgba(32,33,36,0.95)" stroke="rgba(255,255,255,0.1)" stroke-width="1" 
-          opacity="0" pointer-events="none" filter="url(#shadow-${graphId})" />
-    
-    <text id="tooltip-hr-${graphId}" x="0" y="0" font-size="13" fill="#ea4335" 
-          font-weight="600" opacity="0" pointer-events="none"></text>
-    <text id="tooltip-power-${graphId}" x="0" y="0" font-size="13" fill="#4285f4" 
-          font-weight="600" opacity="0" pointer-events="none"></text>
-    <text id="tooltip-time-${graphId}" x="0" y="0" font-size="11" fill="#aaa" 
-          opacity="0" pointer-events="none"></text>
-    
-    <rect x="${padding}" y="${topPadding}" width="${graphWidth}" height="${graphHeight}" 
-          fill="transparent" style="cursor: crosshair;" />
-    
-    <line x1="${padding}" y1="${topPadding}" x2="${padding}" y2="${topPadding + graphHeight}" stroke="#2a2f3a" stroke-width="1.5" />
-    <line x1="${padding}" y1="${topPadding + graphHeight}" x2="${padding + graphWidth}" y2="${topPadding + graphHeight}" stroke="#2a2f3a" stroke-width="1.5" />
-    <text x="${padding - 25}" y="${topPadding - 10}" font-size="10" fill="#ea4335" font-weight="bold">HR</text>
-    <text x="${padding - 5}" y="${topPadding + 4}" text-anchor="end" font-size="11" fill="#9aa0a6">${Math.round(maxHR)}</text>
-    <text x="${padding - 5}" y="${topPadding + graphHeight + 5}" text-anchor="end" font-size="11" fill="#9aa0a6">${Math.round(minHR)}</text>
-    <text x="${padding + graphWidth + 25}" y="${topPadding - powerOffset - 10}" font-size="10" fill="#4285f4" font-weight="bold">Power</text>
-    ${powerAxisLabels}
-    <text x="${padding + graphWidth + 5}" y="${topPadding - powerOffset - 10}" font-size="9" fill="#4285f4" opacity="0.6">watts</text>
-  </svg>
-  <script>
-  (function() {
-    const svg = document.getElementById('${graphId}');
-    const cursor = document.getElementById('cursor-${graphId}');
-    const cursorHR = document.getElementById('cursor-hr-${graphId}');
-    const cursorPower = document.getElementById('cursor-power-${graphId}');
-    const tooltipBg = document.getElementById('tooltip-bg-${graphId}');
-    const tooltipHR = document.getElementById('tooltip-hr-${graphId}');
-    const tooltipPower = document.getElementById('tooltip-power-${graphId}');
-    const tooltipTime = document.getElementById('tooltip-time-${graphId}');
-    
-    const padding = ${padding};
-    const topPadding = ${topPadding};
-    const graphWidth = ${graphWidth};
-    const graphHeight = ${graphHeight};
-    const minHR = ${minHR};
-    const maxHR = ${maxHR};
-    const hrRange = ${hrRange};
-    const powerOffset = ${powerOffset};
-    const maxWatts = ${maxWatts};
-    const wattsRange = ${wattsRange};
-    const minWatts = ${minWatts};
-    
-    const dataPoints = svg.getAttribute('data-points').split(',').map(p => {
-      const [hr, watts] = p.split('|');
-      return { hr: parseFloat(hr), watts: parseFloat(watts) };
-    });
-    
-    const formatTime = (index, total) => {
-      const totalSeconds = (index / total) * ${hrStream.hr.length};
-      const mins = Math.floor(totalSeconds / 60);
-      const secs = Math.floor(totalSeconds % 60);
-      return mins + ':' + secs.toString().padStart(2, '0');
-    };
-    
-    svg.addEventListener('mousemove', (e) => {
-      const rect = svg.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      
-      if (x < padding || x > padding + graphWidth || y < topPadding || y > topPadding + graphHeight) {
-        cursor.setAttribute('opacity', '0');
-        cursorHR.setAttribute('opacity', '0');
-        cursorPower.setAttribute('opacity', '0');
-        tooltipBg.setAttribute('opacity', '0');
-        tooltipHR.setAttribute('opacity', '0');
-        tooltipPower.setAttribute('opacity', '0');
-        tooltipTime.setAttribute('opacity', '0');
-        return;
-      }
-      
-      const relX = x - padding;
-      const index = Math.round((relX / graphWidth) * (dataPoints.length - 1));
-      const dataPoint = dataPoints[index];
-      
-      const pointX = padding + (index / (dataPoints.length - 1)) * graphWidth;
-      const hrY = topPadding + graphHeight - ((dataPoint.hr - minHR) / hrRange) * graphHeight;
-      const powerY = topPadding + graphHeight - ((dataPoint.watts - minWatts) / wattsRange) * graphHeight - powerOffset;
-      
-      cursor.setAttribute('x1', pointX);
-      cursor.setAttribute('x2', pointX);
-      cursor.setAttribute('opacity', '0.6');
-      
-      cursorHR.setAttribute('cx', pointX);
-      cursorHR.setAttribute('cy', hrY);
-      cursorHR.setAttribute('opacity', '1');
-      
-      cursorPower.setAttribute('cx', pointX);
-      cursorPower.setAttribute('cy', powerY);
-      cursorPower.setAttribute('opacity', '1');
-      
-      let tooltipX = pointX + 15;
-      let tooltipY = topPadding + 10;
-      const tooltipWidth = 140;
-      
-      if (pointX > padding + graphWidth - 160) {
-        tooltipX = pointX - tooltipWidth - 15;
-      }
-      
-      tooltipBg.setAttribute('x', tooltipX);
-      tooltipBg.setAttribute('y', tooltipY);
-      tooltipBg.setAttribute('width', tooltipWidth);
-      tooltipBg.setAttribute('height', 70);
-      tooltipBg.setAttribute('opacity', '1');
-      
-      tooltipHR.setAttribute('x', tooltipX + 10);
-      tooltipHR.setAttribute('y', tooltipY + 20);
-      tooltipHR.textContent = 'HR: ' + Math.round(dataPoint.hr) + ' bpm';
-      tooltipHR.setAttribute('opacity', '1');
-      
-      tooltipPower.setAttribute('x', tooltipX + 10);
-      tooltipPower.setAttribute('y', tooltipY + 40);
-      tooltipPower.textContent = 'Power: ' + Math.round(dataPoint.watts) + 'W';
-      tooltipPower.setAttribute('opacity', '1');
-      
-      tooltipTime.setAttribute('x', tooltipX + 10);
-      tooltipTime.setAttribute('y', tooltipY + 58);
-      tooltipTime.textContent = 'Time: ' + formatTime(index, dataPoints.length - 1);
-      tooltipTime.setAttribute('opacity', '1');
-    });
-    
-    svg.addEventListener('mouseleave', () => {
-      cursor.setAttribute('opacity', '0');
-      cursorHR.setAttribute('opacity', '0');
-      cursorPower.setAttribute('opacity', '0');
-      tooltipBg.setAttribute('opacity', '0');
-      tooltipHR.setAttribute('opacity', '0');
-      tooltipPower.setAttribute('opacity', '0');
-      tooltipTime.setAttribute('opacity', '0');
-    });
-  })();
-  </script>
-`;
+        const svgContent = `
+<svg id="${graphId}" width="${width}" height="${height}" style="display:block;margin:0 auto;cursor:crosshair;max-width:100%;" data-points="${dataPoints}">
+  <defs>
+    <filter id="shadow-${graphId}">
+      <feDropShadow dx="0" dy="1" stdDeviation="2" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  ${zoneRects}
+  ${zoneLines}
+  ${powerGridLines}
+  <path d="${powerPathData}" fill="none" stroke="#4285f4" stroke-width="1.5" opacity="0.9"/>
+  <path d="${hrPathData}" fill="none" stroke="#ea4335" stroke-width="1.5"/>
+
+  <line id="cursor-${graphId}" x1="0" y1="${topPadding}" x2="0" y2="${topPadding + graphHeight}" stroke="#666" stroke-width="1.5" opacity="0" pointer-events="none"/>
+  <circle id="cursor-hr-${graphId}" cx="0" cy="0" r="5" fill="#ea4335" stroke="white" stroke-width="2" opacity="0" pointer-events="none" filter="url(#shadow-${graphId})"/>
+  <circle id="cursor-power-${graphId}" cx="0" cy="0" r="5" fill="#4285f4" stroke="white" stroke-width="2" opacity="0" pointer-events="none" filter="url(#shadow-${graphId})"/>
+
+  <!-- Hoverable tooltip -->
+  <g id="tooltip-${graphId}" pointer-events="auto" opacity="0">
+    <rect id="tooltip-bg-${graphId}" x="0" y="0" width="140" height="70" rx="6"
+          fill="rgba(32,33,36,0.95)" stroke="rgba(255,255,255,0.1)" stroke-width="1"
+          filter="url(#shadow-${graphId})" />
+    <text id="tooltip-hr-${graphId}" x="10" y="20" font-size="13" fill="#ea4335" font-weight="600"></text>
+    <text id="tooltip-power-${graphId}" x="10" y="40" font-size="13" fill="#4285f4" font-weight="600"></text>
+    <text id="tooltip-time-${graphId}" x="10" y="58" font-size="11" fill="#aaa"></text>
+  </g>
+
+  <!-- Plot area overlay (expanded) -->
+  <rect id="plot-area-${graphId}" x="${padding - 3}" y="${topPadding - 3}" width="${graphWidth + 6}" height="${graphHeight + 6}" fill="transparent" style="cursor:crosshair;"/>
+
+  <!-- Axes -->
+  <line x1="${padding}" y1="${topPadding}" x2="${padding}" y2="${topPadding + graphHeight}" stroke="#2a2f3a" stroke-width="1.5"/>
+  <line x1="${padding}" y1="${topPadding + graphHeight}" x2="${padding + graphWidth}" y2="${topPadding + graphHeight}" stroke="#2a2f3a" stroke-width="1.5"/>
+  ${xAxisTicks}
+  ${xAxisLabels}
+
+  <text x="${padding - 25}" y="${topPadding - 10}" font-size="10" fill="#ea4335" font-weight="bold">HR</text>
+  <text x="${padding - 5}" y="${topPadding + 4}" text-anchor="end" font-size="11" fill="#9aa0a6">${Math.round(maxHR)}</text>
+  <text x="${padding - 5}" y="${topPadding + graphHeight + 5}" text-anchor="end" font-size="11" fill="#9aa0a6">${Math.round(minHR)}</text>
+  <text x="${padding + graphWidth + 25}" y="${topPadding - powerOffset - 10}" font-size="10" fill="#4285f4" font-weight="bold">Power</text>
+  ${powerAxisLabels}
+</svg>`;
+
+        setTimeout(() => {
+            const svg = document.getElementById(graphId);
+            if (!svg) return;
+
+            const cursor = document.getElementById(`cursor-${graphId}`);
+            const cursorHR = document.getElementById(`cursor-hr-${graphId}`);
+            const cursorPower = document.getElementById(
+                `cursor-power-${graphId}`
+            );
+
+            const tooltipGroup = document.getElementById(`tooltip-${graphId}`);
+            const tooltipHR = document.getElementById(`tooltip-hr-${graphId}`);
+            const tooltipPower = document.getElementById(
+                `tooltip-power-${graphId}`
+            );
+            const tooltipTime = document.getElementById(
+                `tooltip-time-${graphId}`
+            );
+
+            const plotAreaEl = document.getElementById(`plot-area-${graphId}`);
+
+            const dataPointsArr = svg
+                .getAttribute("data-points")
+                .split(",")
+                .map((p) => {
+                    const [hr, watts] = p.split("|");
+                    return { hr: parseFloat(hr), watts: parseFloat(watts) };
+                });
+
+            const formatTimeFromIndex = (index) => {
+                const secs = secondsForIndex(index);
+                const s = Math.max(0, Math.round(secs));
+                const m = Math.floor(s / 60);
+                const r = s % 60;
+                return `${m}:${r.toString().padStart(2, "0")}`;
+            };
+
+            // Visibility controls without timeouts
+            const hoverController = attachStableHover({
+                svg,
+                plotAreaEl,
+                tooltipGroup,
+                cursors: [cursor, cursorHR, cursorPower],
+                show() {
+                    tooltipGroup.setAttribute("opacity", "1");
+                    // cursors are shown via mousemove; no-op here
+                },
+                hide() {
+                    tooltipGroup.setAttribute("opacity", "0");
+                    cursor.setAttribute("opacity", "0");
+                    cursorHR.setAttribute("opacity", "0");
+                    cursorPower.setAttribute("opacity", "0");
+                },
+            });
+
+            svg.addEventListener("mousemove", (e) => {
+                const rect = svg.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                // bounds of plot area
+                const xMin = padding,
+                    xMax = padding + graphWidth;
+                const yMin = topPadding,
+                    yMax = topPadding + graphHeight;
+
+                if (x < xMin || x > xMax || y < yMin || y > yMax) {
+                    // outside plot area; visibility handled by hoverController events
+                    return;
+                }
+
+                const relX = x - padding;
+                const index = Math.round(
+                    (relX / graphWidth) * (dataPointsArr.length - 1)
+                );
+                const dp = dataPointsArr[index];
+
+                const pointX = xForIndex(index);
+                const hrY =
+                    topPadding +
+                    graphHeight -
+                    ((dp.hr - minHR) / hrRange) * graphHeight;
+                const powerY =
+                    topPadding +
+                    graphHeight -
+                    ((dp.watts - minWatts) / wattsRange) * graphHeight -
+                    powerOffset;
+
+                cursor.setAttribute("x1", pointX);
+                cursor.setAttribute("x2", pointX);
+                cursor.setAttribute("opacity", "0.6");
+
+                cursorHR.setAttribute("cx", pointX);
+                cursorHR.setAttribute("cy", hrY);
+                cursorHR.setAttribute("opacity", "1");
+
+                cursorPower.setAttribute("cx", pointX);
+                cursorPower.setAttribute("cy", powerY);
+                cursorPower.setAttribute("opacity", "1");
+
+                // Tooltip placement
+                let tooltipX = pointX + 15;
+                let tooltipY = topPadding + 10;
+                const tooltipWidth = 140;
+                if (pointX > padding + graphWidth - (tooltipWidth + 20)) {
+                    tooltipX = pointX - tooltipWidth - 15;
+                }
+                tooltipGroup.setAttribute(
+                    "transform",
+                    `translate(${tooltipX}, ${tooltipY})`
+                );
+
+                // Content
+                tooltipHR.textContent = `HR: ${Math.round(dp.hr)} bpm`;
+                tooltipPower.textContent = `Power: ${Math.round(dp.watts)}W`;
+                tooltipTime.textContent = `Time: ${formatTimeFromIndex(index)}`;
+
+                // ensure visible while interacting
+                hoverController.ensureVisible();
+            });
+        }, 0);
+
+        return svgContent;
     }
 
     generatePowerGraph(powerStream) {
-        if (!powerStream || !powerStream.watts) {
-            return "";
-        }
+        if (!powerStream || !powerStream.watts) return "";
 
         const getGraphWidth = () => {
             const screenWidth =
@@ -1222,44 +1381,61 @@ class RideRenderer {
         };
 
         const width = getGraphWidth();
-        const height = 200;
+        const height = 220;
         const ftp = window.powerAnalyzer.getFTP();
+
         const padding = 30;
         const topPadding = 40;
         const rightPadding = 50;
+        const bottomPadding = 20;
         const graphWidth = width - padding - rightPadding;
-        const graphHeight = height - topPadding - padding;
+        const graphHeight = height - topPadding - bottomPadding;
 
-        // Sample data
+        const originalLen = powerStream.watts.length;
+        const step = originalLen > 200 ? Math.ceil(originalLen / 200) : 1;
         let sampledWatts = powerStream.watts;
-
-        if (powerStream.watts.length > 200) {
-            const step = Math.ceil(powerStream.watts.length / 200);
+        if (step > 1)
             sampledWatts = powerStream.watts.filter((_, i) => i % step === 0);
+
+        const timeArr = Array.isArray(powerStream.time)
+            ? powerStream.time
+            : null;
+        const hz = powerStream.hz || 1;
+
+        let totalSeconds, secondsForIndex;
+        if (timeArr && timeArr.length >= originalLen) {
+            const t0 = timeArr[0],
+                t1 = timeArr[originalLen - 1];
+            totalSeconds = Math.max(0, t1 - t0);
+            secondsForIndex = (i) =>
+                timeArr[Math.min(originalLen - 1, i * step)] - t0;
+        } else {
+            totalSeconds = originalLen / hz;
+            secondsForIndex = (i) => (i * step) / hz;
         }
+
+        const xForIndex = (i) =>
+            padding + (i / (sampledWatts.length - 1)) * graphWidth;
 
         const validWatts = sampledWatts.filter((w) => w >= 0 && w < 2000);
         const minWatts = 0;
         const maxWatts = Math.max(...validWatts, ftp * 1.5);
         const wattsRange = maxWatts - minWatts;
 
-        // Power line path
         const powerPathData = sampledWatts
             .map((watts, i) => {
                 if (watts < 0 || watts > 2000) return null;
-                const x =
-                    padding + (i / (sampledWatts.length - 1)) * graphWidth;
+                const x = xForIndex(i);
                 const y =
                     topPadding +
                     graphHeight -
                     ((watts - minWatts) / wattsRange) * graphHeight;
                 return `${x} ${y}`;
             })
-            .filter((p) => p !== null)
-            .map((point, i) => `${i === 0 ? "M" : "L"} ${point}`)
+            .filter(Boolean)
+            .map((pt, i) => `${i === 0 ? "M" : "L"} ${pt}`)
             .join(" ");
 
-        // Power grid lines
         const powerMarkers = [0, 100, 200, 300, 400, 500].filter(
             (w) => w <= maxWatts
         );
@@ -1269,11 +1445,9 @@ class RideRenderer {
                     topPadding +
                     graphHeight -
                     ((watts - minWatts) / wattsRange) * graphHeight;
-                return `<line x1="${padding}" y1="${y}" x2="${padding + graphWidth}" y2="${y}" 
-                      stroke="#4285f4" stroke-width="1" stroke-dasharray="3,3" opacity="0.3" />`;
+                return `<line x1="${padding}" y1="${y}" x2="${padding + graphWidth}" y2="${y}" stroke="#4285f4" stroke-width="1" stroke-dasharray="3,3" opacity="0.3" />`;
             })
             .join("");
-
         const powerAxisLabels = powerMarkers
             .map((watts) => {
                 const y =
@@ -1284,132 +1458,177 @@ class RideRenderer {
             })
             .join("");
 
+        // X-axis ticks
+        const tickInterval = (function chooseTimeTickInterval(totalSeconds) {
+            const candidates = [
+                10, 15, 30, 60, 120, 180, 300, 600, 900, 1200, 1800, 3600,
+            ];
+            for (const c of candidates) {
+                const n = Math.floor(totalSeconds / c);
+                if (n >= 5 && n <= 8) return c;
+            }
+            return Math.max(10, Math.round(totalSeconds / 6));
+        })(totalSeconds);
+
+        const timeTicks = [];
+        for (
+            let t = 0;
+            t <= totalSeconds + 0.5 * tickInterval;
+            t += tickInterval
+        ) {
+            const ratio = Math.min(1, t / totalSeconds);
+            const x = padding + ratio * graphWidth;
+            timeTicks.push({ x, label: formatMMSS(t) });
+        }
+        const xAxisTicks = timeTicks
+            .map(
+                ({ x }) =>
+                    `<line x1="${x}" y1="${topPadding + graphHeight}" x2="${x}" y2="${topPadding + graphHeight + 5}" stroke="#9aa0a6" stroke-width="1" />`
+            )
+            .join("");
+        const xAxisLabels = timeTicks
+            .map(({ x, label }) => {
+                let anchor = "middle";
+                if (x <= padding + 2) anchor = "start";
+                if (x >= padding + graphWidth - 2) anchor = "end";
+                return `<text x="${x}" y="${topPadding + graphHeight + 16}" text-anchor="${anchor}" font-size="11" fill="#9aa0a6">${label}</text>`;
+            })
+            .join("");
+
         const graphId = "graph-" + Math.random().toString(36).substr(2, 9);
         const dataPoints = sampledWatts.map((w) => w.toString()).join(",");
 
-        return `
-  <svg id="${graphId}" width="${width}" height="${height}" style="display: block; margin: 0 auto; cursor: crosshair; max-width: 100%;" data-points="${dataPoints}">
-    <defs>
-      <filter id="shadow-${graphId}">
-        <feDropShadow dx="0" dy="1" stdDeviation="2" flood-opacity="0.3"/>
-      </filter>
-    </defs>
-    ${powerGridLines}
-    <path d="${powerPathData}" fill="none" stroke="#4285f4" stroke-width="2.5" opacity="0.9" />
-    
-    <line id="cursor-${graphId}" x1="0" y1="${topPadding}" x2="0" y2="${topPadding + graphHeight}" 
-          stroke="#666" stroke-width="1.5" opacity="0" pointer-events="none" />
-    
-    <circle id="cursor-power-${graphId}" cx="0" cy="0" r="5" fill="#4285f4" stroke="white" 
-            stroke-width="2" opacity="0" pointer-events="none" filter="url(#shadow-${graphId})" />
-    
-    <rect id="tooltip-bg-${graphId}" x="0" y="0" width="120" height="50" rx="6" 
-          fill="rgba(32,33,36,0.95)" stroke="rgba(255,255,255,0.1)" stroke-width="1" 
-          opacity="0" pointer-events="none" filter="url(#shadow-${graphId})" />
-    
-    <text id="tooltip-power-${graphId}" x="0" y="0" font-size="13" fill="#4285f4" 
-          font-weight="600" opacity="0" pointer-events="none"></text>
-    <text id="tooltip-time-${graphId}" x="0" y="0" font-size="11" fill="#aaa" 
-          opacity="0" pointer-events="none"></text>
-    
-    <rect x="${padding}" y="${topPadding}" width="${graphWidth}" height="${graphHeight}" 
-          fill="transparent" style="cursor: crosshair;" />
-    
-    <line x1="${padding}" y1="${topPadding}" x2="${padding}" y2="${topPadding + graphHeight}" stroke="#2a2f3a" stroke-width="1.5" />
-    <line x1="${padding}" y1="${topPadding + graphHeight}" x2="${padding + graphWidth}" y2="${topPadding + graphHeight}" stroke="#2a2f3a" stroke-width="1.5" />
-    <text x="${padding - 10}" y="${topPadding - 10}" font-size="10" fill="#4285f4" font-weight="bold">Power</text>
-    ${powerAxisLabels}
-  </svg>
-  <script>
-  (function() {
-    const svg = document.getElementById('${graphId}');
-    const cursor = document.getElementById('cursor-${graphId}');
-    const cursorPower = document.getElementById('cursor-power-${graphId}');
-    const tooltipBg = document.getElementById('tooltip-bg-${graphId}');
-    const tooltipPower = document.getElementById('tooltip-power-${graphId}');
-    const tooltipTime = document.getElementById('tooltip-time-${graphId}');
-    
-    const padding = ${padding};
-    const topPadding = ${topPadding};
-    const graphWidth = ${graphWidth};
-    const graphHeight = ${graphHeight};
-    const maxWatts = ${maxWatts};
-    const wattsRange = ${wattsRange};
-    const minWatts = ${minWatts};
-    
-    const dataPoints = svg.getAttribute('data-points').split(',').map(w => parseFloat(w));
-    
-    const formatTime = (index, total) => {
-      const totalSeconds = (index / total) * ${powerStream.watts.length};
-      const mins = Math.floor(totalSeconds / 60);
-      const secs = Math.floor(totalSeconds % 60);
-      return mins + ':' + secs.toString().padStart(2, '0');
-    };
-    
-    svg.addEventListener('mousemove', (e) => {
-      const rect = svg.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      
-      if (x < padding || x > padding + graphWidth || y < topPadding || y > topPadding + graphHeight) {
-        cursor.setAttribute('opacity', '0');
-        cursorPower.setAttribute('opacity', '0');
-        tooltipBg.setAttribute('opacity', '0');
-        tooltipPower.setAttribute('opacity', '0');
-        tooltipTime.setAttribute('opacity', '0');
-        return;
-      }
-      
-      const relX = x - padding;
-      const index = Math.round((relX / graphWidth) * (dataPoints.length - 1));
-      const watts = dataPoints[index];
-      
-      const pointX = padding + (index / (dataPoints.length - 1)) * graphWidth;
-      const powerY = topPadding + graphHeight - ((watts - minWatts) / wattsRange) * graphHeight;
-      
-      cursor.setAttribute('x1', pointX);
-      cursor.setAttribute('x2', pointX);
-      cursor.setAttribute('opacity', '0.6');
-      
-      cursorPower.setAttribute('cx', pointX);
-      cursorPower.setAttribute('cy', powerY);
-      cursorPower.setAttribute('opacity', '1');
-      
-      let tooltipX = pointX + 15;
-      let tooltipY = topPadding + 10;
-      const tooltipWidth = 140;
-      
-      if (pointX > padding + graphWidth - 160) {
-        tooltipX = pointX - tooltipWidth - 15;
-      }
-      
-      tooltipBg.setAttribute('x', tooltipX);
-      tooltipBg.setAttribute('y', tooltipY);
-      tooltipBg.setAttribute('width', tooltipWidth);
-      tooltipBg.setAttribute('height', 50);
-      tooltipBg.setAttribute('opacity', '1');
-      
-      tooltipPower.setAttribute('x', tooltipX + 10);
-      tooltipPower.setAttribute('y', tooltipY + 20);
-      tooltipPower.textContent = 'Power: ' + Math.round(watts) + 'W';
-      tooltipPower.setAttribute('opacity', '1');
-      
-      tooltipTime.setAttribute('x', tooltipX + 10);
-      tooltipTime.setAttribute('y', tooltipY + 38);
-      tooltipTime.textContent = 'Time: ' + formatTime(index, dataPoints.length - 1);
-      tooltipTime.setAttribute('opacity', '1');
-    });
-    
-    svg.addEventListener('mouseleave', () => {
-      cursor.setAttribute('opacity', '0');
-      cursorPower.setAttribute('opacity', '0');
-      tooltipBg.setAttribute('opacity', '0');
-      tooltipPower.setAttribute('opacity', '0');
-      tooltipTime.setAttribute('opacity', '0');
-    });
-  })();
-  </script>
-`;
+        const svgContent = `
+<svg id="${graphId}" width="${width}" height="${height}" style="display:block;margin:0 auto;cursor:crosshair;max-width:100%;" data-points="${dataPoints}">
+  <defs>
+    <filter id="shadow-${graphId}">
+      <feDropShadow dx="0" dy="1" stdDeviation="2" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  ${powerGridLines}
+  <path d="${powerPathData}" fill="none" stroke="#4285f4" stroke-width="1.2" opacity="0.9"/>
+  <line id="cursor-${graphId}" x1="0" y1="${topPadding}" x2="0" y2="${topPadding + graphHeight}" stroke="#666" stroke-width="1.5" opacity="0" pointer-events="none"/>
+  <circle id="cursor-power-${graphId}" cx="0" cy="0" r="5" fill="#4285f4" stroke="white" stroke-width="2" opacity="0" pointer-events="none" filter="url(#shadow-${graphId})"/>
+
+  <!-- Hoverable tooltip -->
+  <g id="tooltip-${graphId}" pointer-events="auto" opacity="0">
+    <rect id="tooltip-bg-${graphId}" x="0" y="0" width="140" height="50" rx="6"
+          fill="rgba(32,33,36,0.95)" stroke="rgba(255,255,255,0.1)" stroke-width="1"
+          filter="url(#shadow-${graphId})" />
+    <text id="tooltip-power-${graphId}" x="10" y="20" font-size="13" fill="#4285f4" font-weight="600"></text>
+    <text id="tooltip-time-${graphId}" x="10" y="38" font-size="11" fill="#aaa"></text>
+  </g>
+
+  <!-- Plot area overlay (expanded) -->
+  <rect id="plot-area-${graphId}" x="${padding - 3}" y="${topPadding - 3}" width="${graphWidth + 6}" height="${graphHeight + 6}" fill="transparent" style="cursor:crosshair;"/>
+
+  <!-- Axes -->
+  <line x1="${padding}" y1="${topPadding}" x2="${padding}" y2="${topPadding + graphHeight}" stroke="#2a2f3a" stroke-width="1.5"/>
+  <line x1="${padding}" y1="${topPadding + graphHeight}" x2="${padding + graphWidth}" y2="${topPadding + graphHeight}" stroke="#2a2f3a" stroke-width="1.5"/>
+  ${xAxisTicks}
+  ${xAxisLabels}
+
+  <text x="${padding - 10}" y="${topPadding - 10}" font-size="10" fill="#4285f4" font-weight="bold">Power</text>
+  ${powerAxisLabels}
+</svg>`;
+
+        setTimeout(() => {
+            const svg = document.getElementById(graphId);
+            if (!svg) return;
+
+            const cursor = document.getElementById(`cursor-${graphId}`);
+            const cursorPower = document.getElementById(
+                `cursor-power-${graphId}`
+            );
+            const tooltipGroup = document.getElementById(`tooltip-${graphId}`);
+            const tooltipPower = document.getElementById(
+                `tooltip-power-${graphId}`
+            );
+            const tooltipTime = document.getElementById(
+                `tooltip-time-${graphId}`
+            );
+            const plotAreaEl = document.getElementById(`plot-area-${graphId}`);
+
+            const dataPointsArr = svg
+                .getAttribute("data-points")
+                .split(",")
+                .map((w) => parseFloat(w));
+            const formatTimeFromIndex = (index) => {
+                const secs = secondsForIndex(index);
+                const s = Math.max(0, Math.round(secs));
+                const m = Math.floor(s / 60);
+                const r = s % 60;
+                return `${m}:${r.toString().padStart(2, "0")}`;
+            };
+
+            const hoverController = attachStableHover({
+                svg,
+                plotAreaEl,
+                tooltipGroup,
+                cursors: [cursor, cursorPower],
+                show() {
+                    tooltipGroup.setAttribute("opacity", "1");
+                },
+                hide() {
+                    tooltipGroup.setAttribute("opacity", "0");
+                    cursor.setAttribute("opacity", "0");
+                    cursorPower.setAttribute("opacity", "0");
+                },
+            });
+
+            svg.addEventListener("mousemove", (e) => {
+                const rect = svg.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                const xMin = padding,
+                    xMax = padding + graphWidth;
+                const yMin = topPadding,
+                    yMax = topPadding + graphHeight;
+
+                if (x < xMin || x > xMax || y < yMin || y > yMax) {
+                    return; // visibility handled by hoverController events
+                }
+
+                const relX = x - padding;
+                const index = Math.round(
+                    (relX / graphWidth) * (dataPointsArr.length - 1)
+                );
+                const watts = dataPointsArr[index];
+
+                const pointX = xForIndex(index);
+                const powerY =
+                    topPadding +
+                    graphHeight -
+                    ((watts - minWatts) / wattsRange) * graphHeight;
+
+                cursor.setAttribute("x1", pointX);
+                cursor.setAttribute("x2", pointX);
+                cursor.setAttribute("opacity", "0.6");
+
+                cursorPower.setAttribute("cx", pointX);
+                cursorPower.setAttribute("cy", powerY);
+                cursorPower.setAttribute("opacity", "1");
+
+                let tooltipX = pointX + 15;
+                let tooltipY = topPadding + 10;
+                const tooltipWidth = 140;
+                if (pointX > padding + graphWidth - (tooltipWidth + 20)) {
+                    tooltipX = pointX - tooltipWidth - 15;
+                }
+                tooltipGroup.setAttribute(
+                    "transform",
+                    `translate(${tooltipX}, ${tooltipY})`
+                );
+
+                tooltipPower.textContent = `Power: ${Math.round(watts)}W`;
+                tooltipTime.textContent = `Time: ${formatTimeFromIndex(index)}`;
+
+                hoverController.ensureVisible();
+            });
+        }, 0);
+
+        return svgContent;
     }
 
     /* ---------------- Training load ---------------- */
@@ -1450,6 +1669,106 @@ class RideRenderer {
         html += "</div>";
         container.innerHTML = html;
     }
+}
+
+// Get a sampling step for downsampling to ~maxSamples points
+function getSamplingStep(originalLength, maxSamples = 200) {
+    return originalLength > maxSamples
+        ? Math.ceil(originalLength / maxSamples)
+        : 1;
+}
+
+// Choose a readable tick interval (seconds) based on total duration
+function chooseTimeTickInterval(totalSeconds) {
+    const candidates = [
+        10,
+        15,
+        30,
+        60,
+        120,
+        180,
+        300,
+        600,
+        900,
+        1200,
+        1800, // 1m..30m
+        3600, // 60m
+    ];
+    for (const c of candidates) {
+        const tickCount = Math.floor(totalSeconds / c);
+        if (tickCount >= 5 && tickCount <= 8) return c;
+    }
+    // fallback aiming ~6 ticks
+    return Math.max(10, Math.round(totalSeconds / 6));
+}
+
+function formatMMSS(seconds) {
+    const s = Math.max(0, Math.round(seconds));
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return m + ":" + r.toString().padStart(2, "0");
+}
+
+// Attach deterministic hover handling to keep tooltip visible when hovering either plot area or tooltip.
+function attachStableHover({
+    svg,
+    plotAreaEl,
+    tooltipGroup,
+    cursors = [], // e.g., [cursor, cursorHR, cursorPower]
+    show,
+    hide,
+}) {
+    let isOverPlot = false;
+    let isOverTooltip = false;
+
+    const updateVisibility = () => {
+        if (isOverPlot || isOverTooltip) {
+            show();
+        } else {
+            hide();
+        }
+    };
+
+    // Plot area hover state
+    plotAreaEl.addEventListener("mouseenter", () => {
+        isOverPlot = true;
+        updateVisibility();
+    });
+    plotAreaEl.addEventListener("mouseleave", () => {
+        isOverPlot = false;
+        updateVisibility();
+    });
+
+    // Tooltip hover state
+    tooltipGroup.addEventListener("mouseenter", () => {
+        isOverTooltip = true;
+        updateVisibility();
+    });
+    tooltipGroup.addEventListener("mouseleave", () => {
+        isOverTooltip = false;
+        updateVisibility();
+    });
+
+    // If the entire SVG is left (e.g., fast movement), clear both.
+    svg.addEventListener("mouseleave", () => {
+        isOverPlot = false;
+        isOverTooltip = false;
+        updateVisibility();
+    });
+
+    // Utility: call this when you update tooltip position/content during mousemove.
+    return {
+        ensureVisible() {
+            // If you’re actively interacting (mousemove inside plot), mark as over plot
+            isOverPlot = true;
+            updateVisibility();
+        },
+        hideAll() {
+            isOverPlot = false;
+            isOverTooltip = false;
+            updateVisibility();
+        },
+    };
 }
 
 // Initialize and export singleton

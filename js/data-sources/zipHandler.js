@@ -270,33 +270,38 @@ class ZipHandler {
                         matchedCount++;
 
                         // Add HR stream
-                        if (parsedFit.hrStream) {
-                            matchingRide.hrStream = parsedFit.hrStream;
+                        if (parsedFit.streams.hrStream) {
+                            matchingRide.hrStream = parsedFit.streams.hrStream;
                         }
 
                         // Add power stream and metrics
-                        if (parsedFit.powerStream) {
-                            matchingRide.powerStream = parsedFit.powerStream;
-                            if (parsedFit.avgPower) {
-                                matchingRide.avgPower = parsedFit.avgPower;
+                        if (parsedFit.streams.powerStream) {
+                            matchingRide.powerStream =
+                                parsedFit.streams.powerStream;
+                            if (parsedFit.streams.avgPower) {
+                                matchingRide.avgPower =
+                                    parsedFit.streams.avgPower;
                             }
-                            if (parsedFit.maxPower) {
-                                matchingRide.maxPower = parsedFit.maxPower;
+                            if (parsedFit.streams.maxPower) {
+                                matchingRide.maxPower =
+                                    parsedFit.streams.maxPower;
                             }
                         }
 
                         // Add cadence stream
-                        if (parsedFit.cadenceStream) {
+                        if (parsedFit.streams.cadenceStream) {
                             matchingRide.cadenceStream =
-                                parsedFit.cadenceStream;
-                            if (parsedFit.avgCadence) {
-                                matchingRide.avgCadence = parsedFit.avgCadence;
+                                parsedFit.streams.cadenceStream;
+                            if (parsedFit.streams.avgCadence) {
+                                matchingRide.avgCadence =
+                                    parsedFit.streams.avgCadence;
                             }
                         }
 
                         // Add speed stream
-                        if (parsedFit.speedStream) {
-                            matchingRide.speedStream = parsedFit.speedStream;
+                        if (parsedFit.streams.speedStream) {
+                            matchingRide.speedStream =
+                                parsedFit.streams.speedStream;
                         }
 
                         console.log(
