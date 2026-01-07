@@ -11,7 +11,7 @@ class RunClassifier {
      * Classify a run into training categories
      * Returns: { category, isLong, hrDataType, detailedHR, tendency }
      */
-    classify(run, avgWeekly = null) {
+    classifyRun(run, avgWeekly = null) {
         const zones = this.dataProcessor.getZonesBPM();
 
         // Calculate average weekly if not provided
@@ -312,7 +312,7 @@ class RunClassifier {
     classifyMultiple(runs, avgWeekly = null) {
         return runs.map((run) => ({
             run,
-            classification: this.classify(run, avgWeekly),
+            classification: this.classifyRun(run, avgWeekly),
         }));
     }
 

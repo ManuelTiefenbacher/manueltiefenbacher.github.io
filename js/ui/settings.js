@@ -1,5 +1,5 @@
 // js/ui/settings.js
-// Settings management (HR Max, FTP, Zone configuration, Chart ranges, and Presets)
+// Settings management (HR Max, FTP, Zone configuration, Chart ranges, User Metrics, and Presets)
 
 class SettingsManager {
     constructor() {
@@ -12,6 +12,10 @@ class SettingsManager {
         this.CHART_DEFAULTS = {
             distanceChartMonths: 6,
             intensityChartWeeks: 4,
+        };
+        this.USER_DEFAULTS = {
+            weight: 70, // kg
+            restingHR: 50, // bpm
         };
         this.PRESETS = {
             "last-month": {
@@ -45,6 +49,7 @@ class SettingsManager {
         this.setupFtpControls();
         this.setupZoneControls();
         this.setupChartRangeControls();
+        this.setupUserMetricsControls();
         this.setupPresetButtons();
         this.loadSavedSettings();
     }
@@ -82,6 +87,20 @@ class SettingsManager {
         const ftpInput = document.getElementById("ftpInput");
         if (ftpInput && ftp) {
             ftpInput.value = ftp;
+        }
+
+        // Load user metrics
+        const weight = this.getWeight();
+        const restingHR = this.getRestingHR();
+
+        const weightInput = document.getElementById("weightInput");
+        const restingHRInput = document.getElementById("restingHRInput");
+
+        if (weightInput) {
+            weightInput.value = weight;
+        }
+        if (restingHRInput) {
+            restingHRInput.value = restingHR;
         }
 
         // Load chart ranges
@@ -435,6 +454,78 @@ class SettingsManager {
     }
 
     /**
+     * Setup user metrics controls (Weight, Resting HR)
+     */
+    setupUserMetricsControls() {
+        const saveBtn = document.getElementById("saveUserMetricsBtn");
+        const resetBtn = document.getElementById("resetUserMetricsBtn");
+        const weightInput = document.getElementById("weightInput");
+        const restingHRInput = document.getElementById("restingHRInput");
+
+        if (saveBtn) {
+            saveBtn.addEventListener("click", () => {
+                const weight = Number(weightInput?.value);
+                const restingHR = Number(restingHRInput?.value);
+
+                // Validate weight
+                if (!weight || weight <= 0 || weight > 300) {
+                    window.feedbackManager.showError(
+                        "Please enter a valid weight (1-300 kg)"
+                    );
+                    return;
+                }
+
+                // Validate resting HR
+                if (!restingHR || restingHR <= 0 || restingHR > 100) {
+                    window.feedbackManager.showError(
+                        "Please enter a valid resting HR (1-100 bpm)"
+                    );
+                    return;
+                }
+
+                // Save values
+                this.setWeight(weight);
+                this.setRestingHR(restingHR);
+
+                // Re-analyze to update metrics
+                if (typeof window.analyze === "function") {
+                    window.analyze();
+                }
+
+                window.feedbackManager.showFeedback(
+                    `✅ User metrics updated: ${weight} kg, ${restingHR} bpm resting HR`,
+                    "success"
+                );
+            });
+        }
+
+        if (resetBtn) {
+            resetBtn.addEventListener("click", () => {
+                // Reset to defaults
+                if (weightInput) {
+                    weightInput.value = this.USER_DEFAULTS.weight;
+                }
+                if (restingHRInput) {
+                    restingHRInput.value = this.USER_DEFAULTS.restingHR;
+                }
+
+                this.setWeight(this.USER_DEFAULTS.weight);
+                this.setRestingHR(this.USER_DEFAULTS.restingHR);
+
+                // Re-analyze
+                if (typeof window.analyze === "function") {
+                    window.analyze();
+                }
+
+                window.feedbackManager.showFeedback(
+                    `✅ User metrics reset to defaults: ${this.USER_DEFAULTS.weight} kg, ${this.USER_DEFAULTS.restingHR} bpm`,
+                    "success"
+                );
+            });
+        }
+    }
+
+    /**
      * Setup chart range controls
      */
     setupChartRangeControls() {
@@ -649,6 +740,71 @@ class SettingsManager {
      */
     getChartRanges() {
         return this.loadChartRanges();
+    }
+
+    // ===== USER METRICS METHODS =====
+
+    /**
+     * Get user weight in kg
+     */
+    getWeight() {
+        try {
+            const saved = localStorage.getItem("user_weight");
+            if (saved) {
+                return parseFloat(saved);
+            }
+        } catch (err) {
+            console.error("Failed to load weight:", err);
+        }
+        return this.USER_DEFAULTS.weight;
+    }
+
+    /**
+     * Set user weight in kg
+     */
+    setWeight(weight) {
+        try {
+            localStorage.setItem("user_weight", weight.toString());
+            return true;
+        } catch (err) {
+            console.error("Failed to save weight:", err);
+            return false;
+        }
+    }
+
+    /**
+     * Get user resting heart rate
+     */
+    getRestingHR() {
+        try {
+            const saved = localStorage.getItem("user_resting_hr");
+            if (saved) {
+                return parseInt(saved);
+            }
+        } catch (err) {
+            console.error("Failed to load resting HR:", err);
+        }
+        return this.USER_DEFAULTS.restingHR;
+    }
+
+    /**
+     * Set user resting heart rate
+     */
+    setRestingHR(restingHR) {
+        try {
+            localStorage.setItem("user_resting_hr", restingHR.toString());
+            return true;
+        } catch (err) {
+            console.error("Failed to save resting HR:", err);
+            return false;
+        }
+    }
+
+    /**
+     * Get max HR (uses dataProcessor value)
+     */
+    getMaxHR() {
+        return window.dataProcessor?.hrMax || 190;
     }
 }
 

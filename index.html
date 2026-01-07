@@ -26,6 +26,7 @@
   <link rel="stylesheet" href="css/responsive.css">
   <link rel="stylesheet" href="css/sidebar.css">
   <link rel="stylesheet" href="css/mobile.css">
+  <link rel="stylesheet" href="js/analysis/advancedPowerMetrics.css">
 </head>
 
 <body>
@@ -58,6 +59,10 @@
 
       <div class="nav-section">
         <div class="nav-section-title">Analysis</div>
+        <button class="nav-item" data-page="page-dashboard">
+          <span class="nav-item-icon">📊</span>
+          <span class="nav-item-text">Dashboard</span>
+        </button>
         <button class="nav-item" data-page="page-analysis" data-sport="run">
           <span class="nav-item-icon">🏃</span>
           <span class="nav-item-text">Running</span>
@@ -350,6 +355,43 @@
 
         <hr>
 
+        <!-- User Metrics Section -->
+        <div class="settings-section">
+            <h3>User Metrics</h3>
+            <p class="settings-description">
+                These values are used to calculate advanced metrics like W/kg and hrTSS.
+            </p>
+    
+            <div class="input-group">
+                <label for="weightInput">Weight (kg):</label>
+                <input 
+                    type="number" 
+                    id="weightInput" 
+                    min="30" 
+                    max="300" 
+                    step="0.1"
+                    placeholder="70"
+                />
+            </div>
+    
+            <div class="input-group">
+                <label for="restingHRInput">Resting Heart Rate (bpm):</label>
+                <input 
+                    type="number" 
+                    id="restingHRInput" 
+                    min="30" 
+                    max="100" 
+                    step="1"
+                    placeholder="50"
+                />
+            </div>
+    
+            <div class="button-group">
+                <button id="saveUserMetricsBtn" class="btn-primary">Save User Metrics</button>
+                <button id="resetUserMetricsBtn" class="btn-secondary">Reset to Defaults</button>
+            </div>
+        </div>
+
       <!-- Chart Display Settings -->
       <div class="panel">
         <h2>Chart Display Settings</h2>
@@ -395,7 +437,152 @@
 
       <div class="nav-buttons">
         <button onclick="navigateToPage('page-upload')" class="secondary">← Back to Upload</button>
-        <button onclick="navigateToPage('page-analysis')">Next: Analysis →</button>
+        <button onclick="navigateToPage('page-dashboard')">Next: Dashboard →</button>
+      </div>
+    </div>
+
+    <!-- Page: Dashboard -->
+    <div id="page-dashboard" class="content-page">
+      <div class="page-header">
+        <h1>Training Dashboard</h1>
+        <p>Overview of all your activities and training statistics</p>
+      </div>
+
+      <!-- Total Activities Overview -->
+      <div class="panel">
+        <h2>All Activities</h2>
+        <div class="stats" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+          <div class="stat">
+            <div class="label">Total Activities</div>
+            <div class="value" id="dash-total-activities">—</div>
+          </div>
+          <div class="stat">
+            <div class="label">Total Distance</div>
+            <div class="value" id="dash-total-distance">—</div>
+          </div>
+          <div class="stat">
+            <div class="label">Total Time</div>
+            <div class="value" id="dash-total-time">—</div>
+          </div>
+          <div class="stat">
+            <div class="label">First Activity</div>
+            <div class="value" id="dash-first-activity">—</div>
+          </div>
+          <div class="stat">
+            <div class="label">Latest Activity</div>
+            <div class="value" id="dash-latest-activity">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sport Breakdown -->
+      <div class="panel">
+        <h2>Activities by Sport</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem;">
+          <!-- Running Stats -->
+          <div style="background: rgba(66, 133, 244, 0.05); padding: 1.5rem; border-radius: 8px; border-left: 4px solid #4285f4;">
+            <h3 style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+              <span style="font-size: 1.5rem;">🏃</span>
+              Running
+            </h3>
+            <div class="stats" style="grid-template-columns: 1fr;">
+              <div class="stat">
+                <div class="label">Total Runs</div>
+                <div class="value" id="dash-run-count">—</div>
+              </div>
+              <div class="stat">
+                <div class="label">Total Distance</div>
+                <div class="value" id="dash-run-distance">—</div>
+              </div>
+              <div class="stat">
+                <div class="label">Total Time</div>
+                <div class="value" id="dash-run-time">—</div>
+              </div>
+              <div class="stat">
+                <div class="label">Avg Distance/Run</div>
+                <div class="value" id="dash-run-avg-distance">—</div>
+              </div>
+            </div>
+            <button onclick="navigateToPage('page-analysis'); switchSport('run');" style="width: 100%; margin-top: 1rem;">
+              View Running Analysis →
+            </button>
+          </div>
+
+          <!-- Cycling Stats -->
+          <div style="background: rgba(234, 67, 53, 0.05); padding: 1.5rem; border-radius: 8px; border-left: 4px solid #ea4335;">
+            <h3 style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+              <span style="font-size: 1.5rem;">🚴</span>
+              Cycling
+            </h3>
+            <div class="stats" style="grid-template-columns: 1fr;">
+              <div class="stat">
+                <div class="label">Total Rides</div>
+                <div class="value" id="dash-ride-count">—</div>
+              </div>
+              <div class="stat">
+                <div class="label">Total Distance</div>
+                <div class="value" id="dash-ride-distance">—</div>
+              </div>
+              <div class="stat">
+                <div class="label">Total Time</div>
+                <div class="value" id="dash-ride-time">—</div>
+              </div>
+              <div class="stat">
+                <div class="label">Avg Distance/Ride</div>
+                <div class="value" id="dash-ride-avg-distance">—</div>
+              </div>
+            </div>
+            <button onclick="navigateToPage('page-analysis'); switchSport('ride');" style="width: 100%; margin-top: 1rem; background: #ea4335;">
+              View Cycling Analysis →
+            </button>
+          </div>
+
+          <!-- Swimming Stats -->
+          <div style="background: rgba(52, 168, 83, 0.05); padding: 1.5rem; border-radius: 8px; border-left: 4px solid #34a853;">
+            <h3 style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+              <span style="font-size: 1.5rem;">🏊</span>
+              Swimming
+            </h3>
+            <div class="stats" style="grid-template-columns: 1fr;">
+              <div class="stat">
+                <div class="label">Total Swims</div>
+                <div class="value" id="dash-swim-count">—</div>
+              </div>
+              <div class="stat">
+                <div class="label">Total Distance</div>
+                <div class="value" id="dash-swim-distance">—</div>
+              </div>
+              <div class="stat">
+                <div class="label">Total Time</div>
+                <div class="value" id="dash-swim-time">—</div>
+              </div>
+              <div class="stat">
+                <div class="label">Avg Distance/Swim</div>
+                <div class="value" id="dash-swim-avg-distance">—</div>
+              </div>
+            </div>
+            <button onclick="navigateToPage('page-analysis'); switchSport('swim');" style="width: 100%; margin-top: 1rem; background: #34a853;">
+              View Swimming Analysis →
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Activity Distribution -->
+      <div class="panel">
+        <h2>Activity Distribution (Last 12 Months)</h2>
+        <canvas id="activityDistributionChart" style="max-height: 300px;"></canvas>
+      </div>
+
+      <!-- Monthly Activity Trends -->
+      <div class="panel">
+        <h2>Monthly Activity Trends</h2>
+        <canvas id="monthlyTrendsChart" style="max-height: 400px;"></canvas>
+      </div>
+
+      <div class="nav-buttons">
+        <button onclick="navigateToPage('page-settings')" class="secondary">← Back to Settings</button>
+        <button onclick="navigateToPage('page-analysis')">View Sport Analysis →</button>
       </div>
     </div>
 
@@ -438,19 +625,19 @@
         <!-- Average Weekly Distance Chart -->
         <div class="panel">
           <h2>Average Weekly Distance (Last 6 Months)</h2>
-          <canvas id="chart"></canvas>
-        </div>
-
-        <!-- Timeline -->
-        <div class="panel">
-          <h2>Runs of Previous Four Weeks</h2>
-          <div id="timeline" class="timeline"></div>
+          <canvas id="averageDistanceChartRun"></canvas>
         </div>
 
         <!-- Intensity Chart -->
         <div class="panel">
           <h2>Intensity (Last 4 Weeks)</h2>
-          <canvas id="intensityChart" minwidth="800" minheight="400"></canvas>
+          <canvas id="intensityChartRun" minwidth="800" minheight="400"></canvas>
+        </div>
+
+        <!-- Timeline -->
+        <div class="panel">
+          <h2>Runs of Previous Four Weeks</h2>
+          <div id="timelineRun" class="timeline"></div>
         </div>
       </div>
 
@@ -483,17 +670,17 @@
 
         <div class="panel">
           <h2>Average Weekly Distance (Last 6 Months)</h2>
-          <canvas id="chartRide"></canvas>
-        </div>
-
-        <div class="panel">
-          <h2>Rides of Previous Four Weeks</h2>
-          <div id="timelineRide" class="timeline"></div>
+          <canvas id="averageDistanceChartRide"></canvas>
         </div>
 
         <div class="panel">
           <h2>Intensity (Last 4 Weeks)</h2>
           <canvas id="intensityChartRide" minwidth="800" minheight="400"></canvas>
+        </div>
+
+        <div class="panel">
+          <h2>Rides of Previous Four Weeks</h2>
+          <div id="timelineRide" class="timeline"></div>
         </div>
       </div>
 
@@ -526,22 +713,22 @@
 
         <div class="panel">
           <h2>Average Weekly Distance (Last 6 Months)</h2>
-          <canvas id="chartSwim"></canvas>
-        </div>
-
-        <div class="panel">
-          <h2>Swims of Previous Four Weeks</h2>
-          <div id="timelineSwim" class="timeline"></div>
+          <canvas id="averageDistanceChartSwim"></canvas>
         </div>
 
         <div class="panel">
           <h2>Intensity (Last 4 Weeks)</h2>
           <canvas id="intensityChartSwim" minwidth="800" minheight="400"></canvas>
         </div>
+
+        <div class="panel">
+          <h2>Swims of Previous Four Weeks</h2>
+          <div id="timelineSwim" class="timeline"></div>
+        </div>
       </div>
 
       <div class="nav-buttons">
-        <button onclick="navigateToPage('page-settings')" class="secondary">← Back to Settings</button>
+        <button onclick="navigateToPage('page-dashboard')" class="secondary">← Back to Dashboard</button>
         <div></div>
       </div>
     </div>
@@ -673,20 +860,38 @@
   <script src="js/analysis/intervalDetection.js"></script>
   <script src="js/analysis/trainingLoad.js"></script>
   <script src="js/analysis/powerAnalysis.js"></script>
+  <script src="js/analysis/advancedPowerMetrics.js"></script>
   
   <!-- 5. Data sources (depend on dataProcessor and analysis) -->
   <script src="js/data-sources/zipHandler.js"></script>
   <script src="js/data-sources/stravaApi.js"></script>
   
   <!-- 6. UI layer (depends on everything) -->
+  <script src="js/render-charts/intensityChart.js"></script>
+  <script src="js/render-charts/averageDistanceChart.js"></script>
+  <script src="js/render-charts/timelineChart.js"></script>
   <script src="js/ui/rendererRuns.js"></script>
   <script src="js/ui/rendererRides.js"></script>
   <script src="js/ui/rendererSwims.js"></script>
   <script src="js/ui/settings.js"></script>
   <script src="js/ui/comparison.js"></script>
   <script src="js/ui/visualizationPresets.js"></script>
+  <script src="js/ui/rendererDashboard.js"></script>
   
   <!-- 7. App initialization (loads last, depends on everything) -->
   <script src="js/core/app.js"></script>
+
+  <script>
+    // Helper function to switch sports (used by dashboard buttons)
+    function switchSport(sport) {
+      // Find and click the appropriate nav item
+      const navItems = document.querySelectorAll('.nav-item[data-sport]');
+      navItems.forEach(item => {
+        if (item.dataset.sport === sport) {
+          item.click();
+        }
+      });
+    }
+  </script>
 </body>
-</html>s
+</html>

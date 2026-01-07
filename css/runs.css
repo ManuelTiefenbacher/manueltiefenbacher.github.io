@@ -100,7 +100,7 @@
 }
 
 .badge.long-run {
-    background: #34a853;
+    background: #808080;
     color: white;
 }
 
@@ -126,6 +126,29 @@
 .badge.interval-badge:hover {
     animation: none;
     transform: scale(1.1);
+}
+
+/* ===== POWER DATA BADGES ===== */
+.badge.no-power {
+    background: #ea4335;
+    color: white;
+    font-size: 0.75rem;
+}
+
+.badge.basic-power {
+    background: #fbbc04;
+    color: black;
+}
+
+.badge.detailed-power {
+    background: #4285f4;
+    color: white;
+}
+
+/* ===== HR DATA BADGES ===== */
+.badge.detailed-hr {
+    background: #34a853;
+    color: white;
 }
 
 /* ===== TOOLTIPS ===== */

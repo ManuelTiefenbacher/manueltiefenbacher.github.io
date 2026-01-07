@@ -210,6 +210,7 @@ class TriRunalyzer {
             } else if (targetSport === "swim") {
                 this.analyzeSwims();
             }
+            window.DashboardRenderer.render();
 
             console.log(`✅ ${targetSport} analysis complete`);
         } catch (err) {
@@ -244,8 +245,8 @@ class TriRunalyzer {
         const summaryRuns = window.dataProcessor.getSummaryRuns();
         window.runRenderer.renderBasicInfo(summaryRuns);
         window.runRenderer.renderCharts(runs);
-        window.runRenderer.renderTimeline(runs);
-        window.runRenderer.renderTrainingLoadAnalysis(runs);
+        window.timelineChart.renderChart(runs, "run");
+        window.trainingLoadAnalyzer.renderTrainingLoadAnalysis(runs);
     }
 
     /**
@@ -272,8 +273,8 @@ class TriRunalyzer {
         const summaryRides = window.dataProcessor.getSummaryRides();
         window.rideRenderer.renderBasicInfo(summaryRides);
         window.rideRenderer.renderCharts(rides);
-        window.rideRenderer.renderTimeline(rides);
-        window.rideRenderer.renderTrainingLoadAnalysis(rides);
+        window.timelineChart.renderChart(rides, "ride");
+        window.trainingLoadAnalyzer.renderTrainingLoadAnalysis(rides);
     }
 
     /**
@@ -292,8 +293,8 @@ class TriRunalyzer {
         const summarySwims = window.dataProcessor.getSummarySwims();
         window.swimRenderer.renderBasicInfo(summarySwims);
         window.swimRenderer.renderCharts(swims);
-        window.swimRenderer.renderTimeline(swims);
-        window.swimRenderer.renderTrainingLoadAnalysis(swims);
+        window.timelineChart.renderChart(swims, "swims");
+        window.trainingLoadAnalyzer.renderTrainingLoadAnalysis(swims);
     }
 }
 

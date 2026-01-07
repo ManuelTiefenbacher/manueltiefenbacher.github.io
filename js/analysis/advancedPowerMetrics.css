@@ -1,0 +1,38 @@
+/* ===== ADVANCED METRICS STYLING ===== */
+
+/* Highlight the most important metric (TSS) */
+.tooltip-row.highlight-metric {
+    background: rgba(66, 133, 244, 0.1);
+    padding: 6px 8px;
+    border-radius: 4px;
+    margin: 4px 0;
+    border-left: 3px solid #4285f4;
+}
+
+/* Make training metrics section stand out slightly */
+.tooltip-row.highlight-metric .tooltip-label {
+    font-weight: 700;
+    color: #4285f4;
+}
+
+/* Metric categories (Low, Medium, High, etc.) */
+.tooltip-row .metric-category {
+    font-size: 0.85em;
+    opacity: 0.7;
+    font-style: italic;
+    margin-left: 4px;
+}
+
+/* Color coding for intensity levels */
+.intensity-recovery { color: #34a853; }
+.intensity-endurance { color: #34a853; }
+.intensity-tempo { color: #fbbc04; }
+.intensity-threshold { color: #ff9800; }
+.intensity-vo2max { color: #ea4335; }
+.intensity-anaerobic { color: #d32f2f; }
+
+/* TSS category colors */
+.tss-low { color: #34a853; }
+.tss-medium { color: #fbbc04; }
+.tss-high { color: #ff9800; }
+.tss-very-high { color: #ea4335; }

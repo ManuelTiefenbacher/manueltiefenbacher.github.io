@@ -402,6 +402,69 @@ After a race effort, plan at least 2 easy days before the next hard workout.
 
         return { status, message, metric: "Race Effort Frequency", tooltip };
     }
+
+    calculateDaysSinceRest(activities) {
+        const list = activities;
+        if (!Array.isArray(list) || list.length === 0) return "—";
+
+        const sorted = [...list].sort((a, b) => b.date - a.date);
+        const mostRecent = sorted[0];
+        const daysSinceLast = window.helpers.daysAgo(mostRecent.date);
+
+        if (daysSinceLast > 1) {
+            return 0;
+        }
+
+        let consecutiveDays = 0;
+        for (let i = 0; i < sorted.length - 1; i++) {
+            const current = sorted[i];
+            const next = sorted[i + 1];
+            const gapDays = window.helpers.daysBetween(next.date, current.date);
+            if (gapDays > 1) {
+                consecutiveDays = i + 1;
+                break;
+            }
+        }
+
+        return consecutiveDays || sorted.length;
+    }
+
+    renderTrainingLoadAnalysis(activities) {
+        const container = document.getElementById("trainingLoadAnalysisRide");
+        if (!container) return;
+
+        const analysis = window.trainingLoadAnalyzer.analyze(
+            activities || [],
+            "ride"
+        );
+
+        const statusIcon = { green: "🟢", yellow: "🟡", red: "🔴" };
+        let html = '<div class="training-analysis">';
+
+        Object.values(analysis).forEach((item) => {
+            const tooltipHTML = item.tooltip
+                .replace(/\n/g, "<br>")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/&lt;strong&gt;/g, "<strong>")
+                .replace(/&lt;\/strong&gt;/g, "</strong>")
+                .replace(/&lt;br&gt;/g, "<br>");
+
+            html += `
+        <div class="analysis-card ${item.status}">
+          <div class="analysis-header">
+            <span class="status-icon">${statusIcon[item.status]}</span>
+            <h3>${item.metric}</h3>
+          </div>
+          <p class="analysis-message">${item.message}</p>
+          <div class="analysis-tooltip">${tooltipHTML}</div>
+        </div>
+      `;
+        });
+
+        html += "</div>";
+        container.innerHTML = html;
+    }
 }
 
 // Initialize and export singleton

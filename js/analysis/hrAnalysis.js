@@ -20,6 +20,14 @@ class HRAnalyzer {
         return "none";
     }
 
+    getMaxHR() {
+        return window.userSettings.getMaxHR();
+    }
+
+    getRestingHR() {
+        return window.userSettings.getRestingHR();
+    }
+
     /**
      * Analyze detailed HR stream and return zone distribution
      */
@@ -557,6 +565,104 @@ class HRAnalyzer {
   })();
   </script>
 `;
+    }
+
+    generateHRZoneDoughnut(detailedHR) {
+        const zones = [
+            {
+                label: "Z1",
+                percent: detailedHR.percentZ1,
+                color: "rgba(189, 189, 189, 0.8)",
+            },
+            {
+                label: "Z2",
+                percent: detailedHR.percentZ2,
+                color: "rgba(66, 133, 244, 0.8)",
+            },
+            {
+                label: "Z3",
+                percent: detailedHR.percentZ3,
+                color: "rgba(52, 168, 83, 0.8)",
+            },
+            {
+                label: "Z4",
+                percent: detailedHR.percentZ4,
+                color: "rgba(255, 153, 0, 0.8)",
+            },
+            {
+                label: "Z5",
+                percent: detailedHR.percentZ5,
+                color: "rgba(234, 67, 53, 0.8)",
+            },
+            {
+                label: "Z6",
+                percent: detailedHR.percentZ6,
+                color: "rgba(156, 39, 176, 0.8)",
+            },
+        ];
+
+        const activeZones = zones.filter((z) => z.percent > 0);
+        if (activeZones.length === 0) {
+            return '<div style="text-align:center;color:#666;padding:10px;">No zone data</div>';
+        }
+
+        let cumulativePercent = 0;
+        const radius = 50;
+        const innerRadius = 35;
+        const cx = 60;
+        const cy = 60;
+
+        let paths = "";
+        activeZones.forEach((zone) => {
+            const startAngle =
+                (cumulativePercent / 100) * 2 * Math.PI - Math.PI / 2;
+            const endAngle =
+                ((cumulativePercent + zone.percent) / 100) * 2 * Math.PI -
+                Math.PI / 2;
+
+            const x1 = cx + radius * Math.cos(startAngle);
+            const y1 = cy + radius * Math.sin(startAngle);
+            const x2 = cx + radius * Math.cos(endAngle);
+            const y2 = cy + radius * Math.sin(endAngle);
+
+            const ix1 = cx + innerRadius * Math.cos(startAngle);
+            const iy1 = cy + innerRadius * Math.sin(startAngle);
+            const ix2 = cx + innerRadius * Math.cos(endAngle);
+            const iy2 = cy + innerRadius * Math.sin(endAngle);
+
+            const largeArc = zone.percent > 50 ? 1 : 0;
+
+            paths += `
+                <path d="M ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2} 
+                         L ${ix2} ${iy2} A ${innerRadius} ${innerRadius} 0 ${largeArc} 0 ${ix1} ${iy1} Z"
+                      fill="${zone.color}" stroke="none"/>
+            `;
+
+            cumulativePercent += zone.percent;
+        });
+
+        let legend =
+            '<div style="display:flex;flex-direction:column;gap:6px;">';
+        activeZones.forEach((zone) => {
+            legend += `
+                <div style="display:flex;align-items:center;gap:6px;font-size:12px;">
+                    <div style="width:12px;height:12px;border-radius:2px;background:${zone.color};flex-shrink:0;"></div>
+                    <span style="white-space:nowrap;">${zone.label}: ${zone.percent.toFixed(1)}%</span>
+                </div>
+            `;
+        });
+        legend += "</div>";
+
+        return `
+            <div style="margin-top:12px;display:flex;align-items:center;gap:16px;justify-content:center;">
+                <div style="flex-shrink:0;">
+                    <svg width="120" height="120" viewBox="0 0 120 120">
+                        ${paths}
+                    </svg>
+                </div>
+                ${legend}
+            </div>
+        `;
     }
 }
 
