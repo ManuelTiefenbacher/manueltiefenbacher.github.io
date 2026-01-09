@@ -1,9 +1,13 @@
 // Sidebar Navigation Logic
 document.addEventListener("DOMContentLoaded", function () {
-    initSidebar();
+    console.log("DOM Content Loaded - Initializing sidebar");
+    // Small delay to ensure all scripts are loaded
+    setTimeout(initSidebar, 100);
 });
 
 function initSidebar() {
+    console.log("initSidebar called");
+
     const sidebar = document.querySelector(".sidebar");
     const mainContent = document.querySelector(".main-content");
     const sidebarToggle = document.querySelector(".sidebar-toggle");
@@ -13,19 +17,26 @@ function initSidebar() {
     const sidebarOverlay = document.querySelector(".sidebar-overlay");
     const navItems = document.querySelectorAll(".nav-item");
 
+    console.log("Found nav items:", navItems.length);
+
+    if (navItems.length === 0) {
+        console.error("No nav items found! Check your HTML structure.");
+        return;
+    }
+
     // Desktop sidebar toggle
     if (sidebarToggle) {
         sidebarToggle.addEventListener("click", function () {
             sidebar.classList.toggle("collapsed");
             mainContent.classList.toggle("expanded");
 
-            // Save state to localStorage
+            // Save state to sessionStorage (cleared on page reload)
             const isCollapsed = sidebar.classList.contains("collapsed");
-            localStorage.setItem("sidebarCollapsed", isCollapsed);
+            sessionStorage.setItem("sidebarCollapsed", isCollapsed);
         });
 
         // Restore sidebar state
-        const savedState = localStorage.getItem("sidebarCollapsed");
+        const savedState = sessionStorage.getItem("sidebarCollapsed");
         if (savedState === "true" && window.innerWidth > 968) {
             sidebar.classList.add("collapsed");
             mainContent.classList.add("expanded");
@@ -54,15 +65,32 @@ function initSidebar() {
     navItems.forEach((item) => {
         item.addEventListener("click", (e) => {
             e.preventDefault();
+            e.stopPropagation();
 
             const page = item.getAttribute("data-page");
             const sport = item.getAttribute("data-sport");
 
-            // First, navigate to the analysis page
-            navigateToPage(page);
+            console.log("Nav item clicked:", page, sport);
+
+            // Skip if no page attribute (like refresh/clear buttons)
+            if (!page) {
+                console.log("No page attribute, skipping navigation");
+                return;
+            }
+
+            // First, navigate to the page
+            console.log("About to call navigateToPage with:", page);
+
+            // For analysis page, include sport in hash
+            if (page === "page-analysis" && sport) {
+                navigateToPageWithHash(page, sport);
+            } else {
+                navigateToPageWithHash(page);
+            }
 
             // Then switch to the specific sport
             if (sport) {
+                console.log("About to switch sport to:", sport);
                 setTimeout(() => {
                     switchSportType(sport);
                 }, 100);
@@ -94,7 +122,7 @@ function initSidebar() {
             if (window.innerWidth > 968) {
                 // Desktop: close mobile sidebar, restore collapsed state
                 closeMobileSidebar();
-                const savedState = localStorage.getItem("sidebarCollapsed");
+                const savedState = sessionStorage.getItem("sidebarCollapsed");
                 if (savedState === "true") {
                     sidebar.classList.add("collapsed");
                     mainContent.classList.add("expanded");
@@ -150,8 +178,8 @@ function switchSportType(sport) {
         activeSidebarItem.classList.add("active");
     }
 
-    // Save current sport to localStorage
-    localStorage.setItem("lastVisitedSport", sport);
+    // DON'T save to sessionStorage anymore
+    // sessionStorage.setItem("lastVisitedSport", sport);
 }
 
 function openMobileSidebar() {
@@ -176,7 +204,9 @@ function closeMobileSidebar() {
     document.body.style.overflow = "";
 }
 
-function navigateToPage(pageId) {
+function navigateToPageWithHash(pageId, sport) {
+    console.log("navigateToPageWithHash called with:", pageId, sport);
+
     // Hide all pages
     const pages = document.querySelectorAll(".content-page");
     pages.forEach((page) => page.classList.remove("active"));
@@ -185,6 +215,9 @@ function navigateToPage(pageId) {
     const selectedPage = document.getElementById(pageId);
     if (selectedPage) {
         selectedPage.classList.add("active");
+        console.log("Page activated:", pageId);
+    } else {
+        console.error("Page not found:", pageId);
     }
 
     // Update active nav item
@@ -197,65 +230,51 @@ function navigateToPage(pageId) {
         }
     });
 
-    // Save current page to localStorage
-    localStorage.setItem("lastVisitedPage", pageId);
-
-    // Update URL hash (optional, for bookmarking)
-    window.location.hash = pageId;
+    // Update URL hash to preserve state on reload
+    // For analysis page, include sport in hash
+    if (pageId === "page-analysis" && sport) {
+        window.location.hash = `${pageId}-${sport}`;
+    } else {
+        window.location.hash = pageId;
+    }
+    console.log("Hash set to:", window.location.hash);
 
     // Scroll to top
     window.scrollTo(0, 0);
 }
 
-// Support for legacy switchTab function (backwards compatibility)
-function switchTab(tabName) {
-    const pageMap = {
-        upload: "page-upload",
-        settings: "page-settings",
-        analysis: "page-analysis",
-        comparison: "page-comparison",
-    };
-
-    const pageId = pageMap[tabName] || `page-${tabName}`;
-    navigateToPage(pageId);
+// Override the existing navigateToPage to use our version
+if (typeof navigateToPage !== "undefined") {
+    console.log("Overriding existing navigateToPage function");
 }
+window.navigateToPage = navigateToPageWithHash;
 
-// Initialize on page load - check for hash and restore state
+// Initialize on page load - stay on current page using URL hash
 window.addEventListener("load", function () {
     console.log("=== Page Load Started ===");
 
     const hash = window.location.hash.substring(1);
-    const lastSport = localStorage.getItem("lastVisitedSport");
 
     console.log("URL Hash:", hash);
-    console.log("Last Sport from storage:", lastSport);
 
     if (hash) {
-        // If there's a hash, navigate to it
-        console.log("Navigating to hash:", hash);
-        navigateToPage(hash);
-
-        // Restore sport type if on analysis page
-        if (hash === "page-analysis" && lastSport) {
-            console.log("Switching to saved sport:", lastSport);
+        // Check if hash contains sport info (e.g., "page-analysis-run")
+        if (hash.startsWith("page-analysis-")) {
+            const sport = hash.replace("page-analysis-", "");
+            console.log("Staying on analysis page with sport:", sport);
+            navigateToPageWithHash("page-analysis", sport);
             setTimeout(() => {
-                switchSportType(lastSport);
-            }, 200);
+                switchSportType(sport);
+            }, 100);
+        } else {
+            // Regular page navigation
+            console.log("Staying on page:", hash);
+            navigateToPageWithHash(hash);
         }
-    } else if (lastSport) {
-        // If no hash but there's a saved sport, go to analysis with that sport
-        console.log(
-            "No hash, but found saved sport. Going to analysis page with sport:",
-            lastSport
-        );
-        navigateToPage("page-analysis");
-        setTimeout(() => {
-            switchSportType(lastSport);
-        }, 200);
     } else {
-        // Default to upload page
-        console.log("No hash or saved sport, going to upload");
-        navigateToPage("page-upload");
+        // Only go to upload page if no hash exists (first visit)
+        console.log("No hash found, going to upload page");
+        navigateToPageWithHash("page-upload");
     }
 
     console.log("=== Page Load Complete ===");

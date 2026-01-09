@@ -152,7 +152,7 @@ const advancedMetrics = {
 
                 if (ride.duration) {
                     metrics.tss = this.calculateTSS(
-                        ride.duration,
+                        ride.movingTime,
                         metrics.np,
                         metrics.if,
                         ftp
@@ -170,7 +170,7 @@ const advancedMetrics = {
         }
 
         if (ride.avgPower && ride.duration) {
-            metrics.work = this.calculateWork(ride.avgPower, ride.duration);
+            metrics.work = this.calculateWork(ride.avgPower, ride.movingTime);
         }
 
         if (weightKg) {
@@ -206,7 +206,7 @@ const hrBasedMetrics = {
     calculateHRTSS(durationSeconds, avgHR, maxHR, restingHR = 50) {
         if (!durationSeconds || !avgHR || !maxHR) return null;
 
-        const durationHours = durationSeconds / 3600;
+        const durationHours = durationSeconds / 60;
         const hrReserve = maxHR - restingHR;
         const avgHRPercentage = (avgHR - restingHR) / hrReserve;
 

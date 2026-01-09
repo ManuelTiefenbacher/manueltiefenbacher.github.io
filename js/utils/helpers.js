@@ -157,8 +157,8 @@ function roundTo(value, decimals = 1) {
 
 function calculateAveragePace(run) {
     if (run.paceStream && run.paceStream.pace) {
-        const valid = run.paceStream.pace.filter((p) => p > 0 && p < 20);
-        if (valid.length) return average(valid);
+        if (run.paceStream.pace.length)
+            return average(run.paceStream.pace) / 60;
     }
     if (run.distance > 0 && run.duration > 0) {
         return run.duration / 60 / run.distance; // min/km
@@ -167,10 +167,9 @@ function calculateAveragePace(run) {
 }
 
 function calculateAverageSpeed(ride) {
-    if (ride.paceStream && ride.paceStream.pace) {
-        const valid = ride.paceStream.pace.filter((p) => p > 0 && p < 20);
-        const speedKmh = valid.map((pace) => 60 / pace);
-        if (valid.length) return average(speedKmh);
+    if (ride.distance && ride.duration) {
+        const speedKmh = ride.distance / (ride.duration / 60);
+        if (speedKmh) return speedKmh;
     }
     if (ride.distance > 0 && ride.duration > 0) {
         return ride.distance / 1000 / ride.duration; // km/h

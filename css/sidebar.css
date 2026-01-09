@@ -398,3 +398,11 @@
 .sidebar-nav::-webkit-scrollbar-thumb:hover {
     background: var(--border-light);
 }
+
+.content-page {
+    display: none;
+}
+
+.content-page.active {
+    display: block;
+}

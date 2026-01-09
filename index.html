@@ -195,15 +195,31 @@
             <div id="errorMessage"></div>
             <div id="feedbackMessage"></div>
             
-            <div class="input-group">
-              <label for="clientId">Client ID</label>
-              <input type="text" id="clientId" placeholder="Enter your Strava Client ID">
-            </div>
-            
-            <div class="input-group">
-              <label for="clientSecret">Client Secret</label>
-              <input type="password" id="clientSecret" placeholder="Enter your Strava Client Secret">
-            </div>
+
+  <form id="stravaAuthForm" autocomplete="off">
+    <h2>Connect to Strava</h2>
+    
+    <label for="clientId">Strava Client ID</label>
+    <input
+      type="text"
+      id="clientId"
+      name="clientId"
+      placeholder="Enter your Strava Client ID"
+      autocomplete="off"
+      required
+    />
+
+    <label for="clientSecret">Strava Client Secret</label>
+    <input
+      type="password"
+      id="clientSecret"
+      name="clientSecret"
+      placeholder="Enter your Strava Client Secret"
+      autocomplete="new-password"
+      required
+    />
+  </form>
+
             
             <button id="connectBtn" onclick="initiateAuth()">Connect to Strava</button>
             
@@ -861,6 +877,7 @@
   <script src="js/analysis/trainingLoad.js"></script>
   <script src="js/analysis/powerAnalysis.js"></script>
   <script src="js/analysis/advancedPowerMetrics.js"></script>
+  <script src="js/analysis/advancedRunningMetrics.js"></script>
   
   <!-- 5. Data sources (depend on dataProcessor and analysis) -->
   <script src="js/data-sources/zipHandler.js"></script>

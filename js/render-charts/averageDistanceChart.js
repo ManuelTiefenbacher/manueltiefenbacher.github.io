@@ -50,7 +50,7 @@ class AverageDistanceChart {
                 metricKey: "averagePace",
                 metricColor: "rgba(251, 188, 4, 1)",
                 metricBgColor: "rgba(251, 188, 4, 0.1)",
-                metricFormatter: (value) => window.helpers.formatPace(value),
+                metricFormatter: (value) => value,
                 metricAxisLabel: "Pace (min/km)",
                 zones: ["z1", "z2", "z3", "z4", "z5"],
                 zoneLabels: [

@@ -182,7 +182,7 @@ class StravaAPI {
         try {
             // Fetch all activities with pagination
             const allActivities = [];
-            const perPage = 200;
+            const perPage = 15;
             const maxPages = 1;
 
             for (let page = 1; page <= maxPages; page++) {
@@ -286,6 +286,7 @@ class StravaAPI {
             date: new Date(activity.start_date),
             distance: activity.distance / 1000, // meters to km
             duration: activity.moving_time / 60, // seconds to minutes
+            movingTime: activity.moving_time, // Keep in seconds for TSS calculations
             avgHR: activity.average_heartrate || null,
             maxHR: activity.max_heartrate || null,
             hrStream: activity.hrStream || null,
@@ -293,6 +294,14 @@ class StravaAPI {
             powerStream: activity.powerStream || null,
             avgPower: activity.average_watts || null,
             maxPower: activity.max_watts || null,
+            avgPace: activity.avgPace || null, // seconds per km
+            cadenceStream: activity.cadenceStream || null,
+            altitudeStream: activity.altitudeStream || null,
+            distanceStream: activity.distanceStream || null,
+            distanceMeters:
+                activity.distanceMeters ||
+                (activity.distance ? activity.distance : null), // meters
+            totalSteps: activity.totalSteps || null,
             source: "Strava API",
         };
     }
@@ -307,6 +316,9 @@ class StravaAPI {
                 let hrStream = null;
                 let paceStream = null;
                 let powerStream = null;
+                let cadenceStream = null;
+                let altitudeStream = null;
+                let distanceStream = null;
 
                 try {
                     // Fetch detailed activity
@@ -328,15 +340,17 @@ class StravaAPI {
                             hrStream: null,
                             paceStream: null,
                             powerStream: null,
+                            cadenceStream: null,
                         };
                     }
 
                     const detailData = await detailResponse.json();
 
-                    // Fetch HR, PACE, and POWER streams WITHOUT key_by_type
+                    // Fetch all available streams
+                    // Keys: heartrate, time, velocity_smooth, watts, cadence, altitude, distance
                     try {
                         const streamResponse = await fetch(
-                            `https://www.strava.com/api/v3/activities/${activity.id}/streams?keys=heartrate,time,velocity_smooth,watts`,
+                            `https://www.strava.com/api/v3/activities/${activity.id}/streams?keys=heartrate,time,velocity_smooth,watts,cadence,altitude,distance`,
                             {
                                 headers: {
                                     Authorization: `Bearer ${this.accessToken}`,
@@ -352,7 +366,7 @@ class StravaAPI {
                                 streamData
                             );
 
-                            // The response is an array of stream objects
+                            // Extract individual streams
                             const hrData = streamData.find(
                                 (s) => s.type === "heartrate"
                             );
@@ -364,6 +378,15 @@ class StravaAPI {
                             );
                             const powerData = streamData.find(
                                 (s) => s.type === "watts"
+                            );
+                            const cadenceData = streamData.find(
+                                (s) => s.type === "cadence"
+                            );
+                            const altitudeData = streamData.find(
+                                (s) => s.type === "altitude"
+                            );
+                            const distanceData = streamData.find(
+                                (s) => s.type === "distance"
                             );
 
                             // HR Stream
@@ -382,7 +405,7 @@ class StravaAPI {
                                 );
                             }
 
-                            // Pace Stream (convert velocity m/s to min/km)
+                            // Pace Stream (convert velocity m/s to seconds/km)
                             if (
                                 velocityData &&
                                 velocityData.data &&
@@ -391,18 +414,27 @@ class StravaAPI {
                             ) {
                                 paceStream = {
                                     pace: velocityData.data.map((v) => {
-                                        // Convert m/s to min/km
-                                        // v = m/s, pace = min/km = (1000m / 1km) / (v m/s * 60 s/min) = 1000/(v*60)
+                                        // Convert m/s to seconds/km
+                                        // pace (sec/km) = 1000 / v
                                         if (
                                             v === 0 ||
                                             v === null ||
                                             v === undefined
                                         )
                                             return 0;
-                                        return 1000 / (v * 60);
+                                        return 1000 / v;
                                     }),
                                     time: timeData.data,
                                 };
+
+                                // Add elevation and distance to paceStream for NGP calculation
+                                if (altitudeData && altitudeData.data) {
+                                    paceStream.elevation = altitudeData.data;
+                                }
+                                if (distanceData && distanceData.data) {
+                                    paceStream.distance = distanceData.data;
+                                }
+
                                 console.log(
                                     `✓ Pace stream found for activity ${activity.id}: ${velocityData.data.length} points`
                                 );
@@ -413,7 +445,7 @@ class StravaAPI {
                                     `  Sample paces: ${paceStream.pace
                                         .slice(0, 5)
                                         .map((p) => p.toFixed(2))
-                                        .join(", ")} min/km`
+                                        .join(", ")} sec/km`
                                 );
                             } else {
                                 console.log(
@@ -456,6 +488,97 @@ class StravaAPI {
                                     `✗ No power stream for activity ${activity.id}`
                                 );
                             }
+
+                            // Cadence Stream
+                            if (
+                                cadenceData &&
+                                cadenceData.data &&
+                                timeData &&
+                                timeData.data
+                            ) {
+                                // For running: cadence is in steps per minute (SPM)
+                                // For cycling: cadence is in revolutions per minute (RPM)
+                                cadenceStream = cadenceData.data;
+
+                                console.log(
+                                    `✓ Cadence stream found for activity ${activity.id}: ${cadenceData.data.length} points`
+                                );
+                                console.log(
+                                    `  Sample cadence: ${cadenceData.data.slice(0, 5).join(", ")} ${activity.type === "Run" ? "spm" : "rpm"}`
+                                );
+                            } else {
+                                console.log(
+                                    `✗ No cadence stream for activity ${activity.id}`
+                                );
+                            }
+
+                            // Altitude Stream (for elevation profile)
+                            if (altitudeData && altitudeData.data) {
+                                altitudeStream = altitudeData.data;
+                                console.log(
+                                    `✓ Altitude stream found for activity ${activity.id}: ${altitudeData.data.length} points`
+                                );
+                            }
+
+                            // Distance Stream (for precise calculations)
+                            if (distanceData && distanceData.data) {
+                                distanceStream = distanceData.data;
+                                console.log(
+                                    `✓ Distance stream found for activity ${activity.id}: ${distanceData.data.length} points`
+                                );
+                            }
+
+                            // Calculate average pace from stream if available
+                            if (paceStream && paceStream.pace.length > 0) {
+                                const validPaces = paceStream.pace.filter(
+                                    (p) => p > 0 && p < 1000
+                                );
+                                if (validPaces.length > 0) {
+                                    detailData.avgPace =
+                                        validPaces.reduce((a, b) => a + b, 0) /
+                                        validPaces.length;
+                                    console.log(
+                                        `  Calculated avgPace: ${detailData.avgPace.toFixed(2)} sec/km`
+                                    );
+                                }
+                            }
+
+                            // Calculate total steps for stride length calculation
+                            if (cadenceStream && activity.type === "Run") {
+                                // Total steps = sum of (cadence * time_interval / 60)
+                                // Approximate: cadence is already in steps per minute
+                                // For simplicity: sum all cadence values and divide by data points per minute
+                                const timeIntervals = [];
+                                for (let i = 1; i < timeData.data.length; i++) {
+                                    timeIntervals.push(
+                                        timeData.data[i] - timeData.data[i - 1]
+                                    );
+                                }
+                                const avgInterval =
+                                    timeIntervals.reduce((a, b) => a + b, 0) /
+                                    timeIntervals.length;
+                                const stepsPerSecond = cadenceStream.map(
+                                    (c) => c / 60
+                                );
+                                detailData.totalSteps = Math.round(
+                                    stepsPerSecond.reduce((sum, sps, i) => {
+                                        const interval =
+                                            i < timeIntervals.length
+                                                ? timeIntervals[i]
+                                                : avgInterval;
+                                        return sum + sps * interval;
+                                    }, 0)
+                                );
+                                console.log(
+                                    `  Calculated totalSteps: ${detailData.totalSteps}`
+                                );
+                            }
+
+                            // Store distance in meters for stride length calculation
+                            if (detailData.distance) {
+                                detailData.distanceMeters =
+                                    detailData.distance * 1000;
+                            }
                         } else {
                             console.warn(
                                 `Stream request failed for activity ${activity.id}: ${streamResponse.status}`
@@ -468,7 +591,15 @@ class StravaAPI {
                         );
                     }
 
-                    return { ...detailData, hrStream, paceStream, powerStream };
+                    return {
+                        ...detailData,
+                        hrStream,
+                        paceStream,
+                        powerStream,
+                        cadenceStream,
+                        altitudeStream,
+                        distanceStream,
+                    };
                 } catch (err) {
                     console.error(
                         `Error fetching activity ${activity.id}:`,
@@ -479,6 +610,9 @@ class StravaAPI {
                         hrStream: null,
                         paceStream: null,
                         powerStream: null,
+                        cadenceStream: null,
+                        altitudeStream: null,
+                        distanceStream: null,
                     };
                 }
             })

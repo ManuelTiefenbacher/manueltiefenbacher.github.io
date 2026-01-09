@@ -17,132 +17,11 @@ class DataProcessor {
     }
 
     /**
-     * Normalize run-like activity to unified format
-     * Handles data from Strava API, CSV, and TCX files
-     * NOTE: Used for runs, rides, and swims to keep a common shape.
-     */
-    normalizeRun(run) {
-        return {
-            id: run.id,
-            date: run.date instanceof Date ? run.date : new Date(run.date),
-            distance: Number(run.distance) || 0, // kilometers or meters based on your upstream parser
-            duration: Number(run.duration) || 0, // seconds
-            avgHR: Number(run.avgHR) || null,
-            maxHR: Number(run.maxHR) || null,
-
-            // Unified HR stream format: { heartrate: [...], time: [...] }
-            hrStream: this.normalizeHRStream(run.hrStream),
-
-            // Unified pace stream format: { pace: [...], time: [...] }
-            // For rides/swims, you may feed speed/cadence/etc. through paceStream
-            paceStream: this.normalizePaceStream(run.paceStream),
-
-            // Metadata
-            source: run.source || "unknown",
-            filename: run.filename || null,
-        };
-    }
-
-    normalizeRide(ride) {
-        return {
-            id: ride.id,
-            date: ride.date instanceof Date ? ride.date : new Date(ride.date),
-            distance: Number(ride.distance) || 0, // kilometers or meters based on your upstream parser
-            duration: Number(ride.duration) || 0, // seconds
-            avgHR: Number(ride.avgHR) || null,
-            maxHR: Number(ride.maxHR) || null,
-
-            avgPower: Number(ride.avgPower) || null,
-            maxPower: Number(ride.maxPower) || null,
-
-            // Unified HR stream format: { heartrate: [...], time: [...] }
-            hrStream: this.normalizeHRStream(ride.hrStream),
-
-            // Unified pace stream format: { pace: [...], time: [...] }
-            // For rides/swims, you may feed speed/cadence/etc. through paceStream
-            paceStream: this.normalizePaceStream(ride.paceStream),
-
-            powerStream: this.normalizePowerStream(ride.powerStream),
-            // Metadata
-            source: ride.source || "unknown",
-            filename: ride.filename || null,
-        };
-    }
-
-    /**
-     * Normalize HR stream to consistent format
-     */
-    normalizeHRStream(hrStream) {
-        if (!hrStream) return null;
-
-        // Already in correct format
-        if (hrStream.heartrate && hrStream.time) {
-            return {
-                heartrate: hrStream.heartrate.filter(
-                    (hr) => hr > 0 && hr < 250
-                ),
-                time: hrStream.time,
-            };
-        }
-
-        // Legacy format from TCX parser
-        if (hrStream.records) {
-            return {
-                heartrate: hrStream.records.map((r) => r.heart_rate),
-                time: hrStream.records.map((r, i) => i), // Use index if no time
-            };
-        }
-
-        return null;
-    }
-
-    /**
-     * Normalize pace stream to consistent format
-     * pace in min/km (filter unrealistic values)
-     */
-    normalizePaceStream(paceStream) {
-        if (!paceStream) return null;
-
-        // Already in correct format
-        if (paceStream.pace && paceStream.time) {
-            return {
-                pace: paceStream.pace.filter((p) => p > 0 && p < 20), // min/km
-                time: paceStream.time,
-            };
-        }
-
-        return null;
-    }
-
-    /**
-     * Normalize power stream to consistent format
-     * pace in min/km (filter unrealistic values)
-     */
-    normalizePowerStream(powerStream) {
-        if (!powerStream) return null;
-
-        // Already in correct format
-        if (powerStream.watts && powerStream.time) {
-            return {
-                watts: powerStream.watts.filter((p) => p > 0 && p < 2000), // Watt
-                time: powerStream.time,
-            };
-        }
-
-        return null;
-    }
-
-    /**
      * Add runs from any source with automatic deduplication
      */
     addRuns(newRuns, source = "unknown") {
-        const normalized = newRuns.map((run) => ({
-            ...this.normalizeRun(run),
-            source,
-        }));
-
         // Combine and deduplicate (keep latest occurrence)
-        const combined = [...this.runs, ...normalized];
+        const combined = [...this.runs, ...newRuns];
         const uniqueMap = new Map();
 
         combined.forEach((run) => {
@@ -158,8 +37,9 @@ class DataProcessor {
         );
 
         console.log(
-            `📊 Total unique runs: ${this.runs.length} (added ${normalized.length} from ${source})`
+            `📊 Total unique runs: ${this.runs.length} (added ${newRuns.length} from ${source})`
         );
+        console.log(this.runs);
         return this.runs;
     }
 
@@ -167,12 +47,7 @@ class DataProcessor {
      * Add rides from any source with automatic deduplication
      */
     addRides(newRides, source = "unknown") {
-        const normalized = newRides.map((ride) => ({
-            ...this.normalizeRide(ride),
-            source,
-        }));
-
-        const combined = [...this.rides, ...normalized];
+        const combined = [...this.rides, ...newRides];
         const uniqueMap = new Map();
 
         combined.forEach((ride) => {
@@ -187,8 +62,9 @@ class DataProcessor {
         );
 
         console.log(
-            `📊 Total unique rides: ${this.rides.length} (added ${normalized.length} from ${source})`
+            `📊 Total unique rides: ${this.rides.length} (added ${newRides.length} from ${source})`
         );
+        console.log(this.rides);
         return this.rides;
     }
 
@@ -196,12 +72,7 @@ class DataProcessor {
      * Add swims from any source with automatic deduplication
      */
     addSwims(newSwims, source = "unknown") {
-        const normalized = newSwims.map((swim) => ({
-            ...this.normalizeRun(swim),
-            source,
-        }));
-
-        const combined = [...this.swims, ...normalized];
+        const combined = [...this.swims, ...newSwims];
         const uniqueMap = new Map();
 
         combined.forEach((swim) => {
@@ -216,7 +87,7 @@ class DataProcessor {
         );
 
         console.log(
-            `📊 Total unique swims: ${this.swims.length} (added ${normalized.length} from ${source})`
+            `📊 Total unique swims: ${this.swims.length} (added ${newSwims.length} from ${source})`
         );
         return this.swims;
     }
