@@ -6,21 +6,6 @@ class RunRenderer {
         this.chart = null;
     }
 
-    /* ---------------- Small UI helpers ---------------- */
-
-    _setText(id, value) {
-        const el = document.getElementById(id);
-        if (!el) return;
-        el.textContent = value ?? "—";
-    }
-
-    _setKm(id, value) {
-        const el = document.getElementById(id);
-        if (!el) return;
-        const num = Number(value ?? 0);
-        el.textContent = `${num.toFixed(1)} km`;
-    }
-
     /* ---------------- Basic info (RUNS) ---------------- */
 
     /**
@@ -149,6 +134,21 @@ class RunRenderer {
         }));
 
         return result.sort((a, b) => a.weekStart - b.weekStart);
+    }
+
+    /* ---------------- Small UI helpers ---------------- */
+
+    _setText(id, value) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = value ?? "—";
+    }
+
+    _setKm(id, value) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const num = Number(value ?? 0);
+        el.textContent = `${num.toFixed(1)} km`;
     }
 }
 

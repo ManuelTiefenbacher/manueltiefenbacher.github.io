@@ -47,10 +47,10 @@ class AverageDistanceChart {
                 calculateWeeklyData: "calculateWeeklyZoneData",
                 renderer: window.runRenderer,
                 metricLabel: "Average Pace (min/km)",
-                metricKey: "averagePace",
+                metricKey: "avgPace",
                 metricColor: "rgba(251, 188, 4, 1)",
                 metricBgColor: "rgba(251, 188, 4, 0.1)",
-                metricFormatter: (value) => value,
+                metricFormatter: (value) => `${value.toFixed(2)}min/km`,
                 metricAxisLabel: "Pace (min/km)",
                 zones: ["z1", "z2", "z3", "z4", "z5"],
                 zoneLabels: [
@@ -72,7 +72,7 @@ class AverageDistanceChart {
                 calculateWeeklyData: "calculateWeeklyZoneData",
                 renderer: window.swimRenderer,
                 metricLabel: "Average Pace (min/100m)",
-                metricKey: "averagePace",
+                metricKey: "avgPace",
                 metricColor: "rgba(251, 188, 4, 1)",
                 metricBgColor: "rgba(251, 188, 4, 0.1)",
                 metricFormatter: (value) =>
@@ -138,28 +138,33 @@ class AverageDistanceChart {
         });
 
         // Add metric line (FTP or pace)
+
         const metricValues = weeklyData
             .map((w) => w[config.metricKey])
-            .filter((v) => v !== null && v !== undefined);
+            .filter((v) => v !== null && v !== undefined && !Number.isNaN(v));
+
+        const defaultBounds =
+            sportType === "ride" ? { min: 0, max: 300 } : { min: 3, max: 7 };
+
         const maxMetric =
             metricValues.length > 0
                 ? Math.max(...metricValues)
-                : sportType === "ride"
-                  ? 300
-                  : 6;
+                : defaultBounds.max;
+
         const minMetric =
             metricValues.length > 0
                 ? Math.min(...metricValues)
-                : sportType === "ride"
-                  ? 0
-                  : 3;
+                : defaultBounds.min;
 
         let suggestedMaxMetric;
         if (sportType === "ride") {
             suggestedMaxMetric = Math.ceil((maxMetric + 20) / 50) * 50;
         } else {
-            suggestedMaxMetric = Math.ceil(maxMetric * 1.1);
+            suggestedMaxMetric = Math.ceil((maxMetric + 0.2) * 10) / 10;
         }
+
+        console.log("weeklyData sample:", weeklyData.slice(0, 3));
+        console.log("metricValues:", metricValues);
 
         datasets.push({
             type: "line",
@@ -228,10 +233,10 @@ class AverageDistanceChart {
                         },
                         grid: { color: "#2a2f3a" },
                     },
+
                     y2: {
                         position: "right",
-                        beginAtZero: sportType === "ride",
-                        reverse: sportType !== "ride",
+                        beginAtZero: true,
                         title: {
                             display: true,
                             text: config.metricAxisLabel,
@@ -244,8 +249,14 @@ class AverageDistanceChart {
                         grid: { drawOnChartArea: false },
                         suggestedMax: suggestedMaxMetric,
                         suggestedMin:
-                            sportType !== "ride" ? minMetric * 0.9 : undefined,
+                            sportType !== "ride"
+                                ? Math.max(
+                                      0,
+                                      Math.floor((minMetric - 0.2) * 10) / 10
+                                  )
+                                : undefined,
                     },
+
                     x: {
                         stacked: true,
                         ticks: { color: "#9aa0a6" },

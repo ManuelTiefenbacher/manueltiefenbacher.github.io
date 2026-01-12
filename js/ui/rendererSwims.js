@@ -290,45 +290,6 @@ class SwimRenderer {
         html += "</div>";
         return html;
     }
-
-    /* ---------------- Training load ---------------- */
-
-    renderTrainingLoadAnalysis(activities) {
-        const container = document.getElementById("trainingLoadAnalysisSwim");
-        if (!container) return;
-
-        const analysis = window.trainingLoadAnalyzer.analyze(
-            activities || [],
-            "swim"
-        );
-
-        const statusIcon = { green: "🟢", yellow: "🟡", red: "🔴" };
-        let html = '<div class="training-analysis">';
-
-        Object.values(analysis).forEach((item) => {
-            const tooltipHTML = item.tooltip
-                .replace(/\n/g, "<br>")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/&lt;strong&gt;/g, "<strong>")
-                .replace(/&lt;\/strong&gt;/g, "</strong>")
-                .replace(/&lt;br&gt;/g, "<br>");
-
-            html += `
-        <div class="analysis-card ${item.status}">
-          <div class="analysis-header">
-            <span class="status-icon">${statusIcon[item.status]}</span>
-            <h3>${item.metric}</h3>
-          </div>
-          <p class="analysis-message">${item.message}</p>
-          <div class="analysis-tooltip">${tooltipHTML}</div>
-        </div>
-      `;
-        });
-
-        html += "</div>";
-        container.innerHTML = html;
-    }
 }
 
 // Initialize and export singleton

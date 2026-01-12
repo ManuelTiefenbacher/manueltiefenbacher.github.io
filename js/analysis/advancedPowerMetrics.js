@@ -206,7 +206,7 @@ const hrBasedMetrics = {
     calculateHRTSS(durationSeconds, avgHR, maxHR, restingHR = 50) {
         if (!durationSeconds || !avgHR || !maxHR) return null;
 
-        const durationHours = durationSeconds / 60;
+        const durationHours = durationSeconds / 3600;
         const hrReserve = maxHR - restingHR;
         const avgHRPercentage = (avgHR - restingHR) / hrReserve;
 

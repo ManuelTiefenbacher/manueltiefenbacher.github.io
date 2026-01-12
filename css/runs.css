@@ -168,6 +168,8 @@
     max-width: 850px;
     box-shadow: var(--shadow-lg);
     animation: fadeIn 0.2s ease;
+    pointer-events: auto;
+    margin-top: 4px;
 }
 
 .tooltip-row {

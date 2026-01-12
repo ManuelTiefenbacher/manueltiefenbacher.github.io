@@ -15,16 +15,12 @@ class TimelineChart {
         );
         const sorted = [...recent].sort((a, b) => b.date - a.date);
 
-        // Determine the appropriate method and renderer based on sport type
         const methodMap = {
             ride: {
                 classifier: "classifyRide",
                 renderer: window.runClassifier,
             },
-            run: {
-                classifier: "classifyRun",
-                renderer: window.runClassifier,
-            },
+            run: { classifier: "classifyRun", renderer: window.runClassifier },
             swim: {
                 classifier: "classifySwim",
                 renderer: window.runClassifier,
@@ -46,7 +42,7 @@ class TimelineChart {
     }
 
     createElement(activity, classification, sportType = "ride") {
-        const { category, isLong, powerDataType } = classification;
+        const { category } = classification;
         const cssClass = window.runClassifier.getCategoryClass(category);
 
         const el = document.createElement("div");
@@ -63,524 +59,686 @@ class TimelineChart {
             sportType,
             intervalInfo
         );
+        const badges = this.createBadges(
+            activity,
+            classification,
+            sportType,
+            intervalInfo
+        );
 
-        let badges = "";
+        el.innerHTML = `
+            <span>${window.helpers.formatDateFull(activity.date)} — ${category}</span>
+            <span>
+                ${badges}
+                <span class="badge">${(activity.distance ?? 0).toFixed(1)} km</span>
+            </span>
+            ${tooltip}
+        `;
 
-        // HR Data badges
-        if (!activity.avgHR) {
-            badges += '<span class="badge no-hr">No HR</span>';
-        } else if (!activity.hrStream) {
-            badges += '<span class="badge basic-hr">Basic HR</span>';
-        } else if (activity.hrStream) {
-            badges += '<span class="badge detailed-hr">Detailed HR</span>';
-        }
-
-        // Power Data badges
-        if (powerDataType === "none") {
-            badges += '<span class="badge no-power">No Power</span>';
-        } else if (powerDataType === "basic") {
-            badges += '<span class="badge basic-power">Basic Power</span>';
-        } else if (powerDataType === "detailed") {
-            badges +=
-                '<span class="badge detailed-power">Detailed Power</span>';
-        }
-
-        if (sportType === "run") {
-            // Interval badges
-            if (intervalInfo && intervalInfo.isInterval) {
-                badges +=
-                    '<span class="badge interval-badge">⚡ Interval</span>';
-            }
-
-            // Long Run badges
-            if (classification.isLong) {
-                badges += '<span class="badge long-run">Long Run</span>';
-            }
-        }
-
-        el.innerHTML = `<span>${window.helpers.formatDateFull(activity.date)} — ${category}</span><span>${badges}<span class="badge">${(activity.distance ?? 0).toFixed(1)} km</span></span>${tooltip}`;
-
-        // Improve tooltip hover behavior
-        setTimeout(() => {
-            const tooltipEl = el.querySelector(".tooltip");
-            if (tooltipEl) {
-                el.addEventListener("mouseleave", (e) => {
-                    const toElement = e.relatedTarget;
-                    if (toElement && tooltipEl.contains(toElement)) {
-                        return;
-                    }
-                    tooltipEl.style.pointerEvents = "auto";
-                });
-
-                tooltipEl.addEventListener("mouseenter", () => {
-                    tooltipEl.style.pointerEvents = "auto";
-                });
-            }
-        }, 0);
-
+        this.attachTooltipBehavior(el);
         return el;
     }
 
-    createTooltip(activity, classification, sportType, intervalInfo) {
-        const {
-            category,
-            powerDataType,
-            detailedPower,
-            hrDataType,
-            detailedHR,
-        } = classification;
+    createBadges(activity, classification, sportType, intervalInfo) {
+        const badges = [];
 
-        let html = '<div class="tooltip">';
+        // HR Data badges
+        badges.push(this.createHRBadge(activity));
 
-        html += `
-      <div class="tooltip-row">
-        <span class="tooltip-label">Type:</span>
-        <span class="tooltip-value">${category}</span>
-      </div>
-      <div class="tooltip-row">
-        <span class="tooltip-label">Distance:</span>
-        <span class="tooltip-value">${(activity.distance ?? 0).toFixed(2)} km</span>
-      </div>
-    `;
-
-        if (intervalInfo && intervalInfo.isInterval) {
-            html += `
-    <div class="tooltip-row" style="background: rgba(251, 188, 4, 0.1); padding: 4px; border-radius: 4px; margin: 8px 0;">
-      <span class="tooltip-label">⚡ Intervals:</span>
-      <span class="tooltip-value">${intervalInfo.details}</span>
-    </div>
-  `;
+        // Power Data badges
+        if (sportType !== "run") {
+            badges.push(this.createPowerBadge(classification.powerDataType));
         }
 
+        // Run-specific badges
+        if (sportType === "run") {
+            if (intervalInfo?.isInterval) {
+                badges.push(
+                    '<span class="badge interval-badge">⚡ Interval</span>'
+                );
+            }
+            if (classification.isLong) {
+                badges.push('<span class="badge long-run">Long Run</span>');
+            }
+        }
+
+        return badges.join("");
+    }
+
+    createHRBadge(activity) {
+        if (!activity.avgHR) {
+            return '<span class="badge no-hr">No HR</span>';
+        } else if (!activity.hrStream) {
+            return '<span class="badge basic-hr">Basic HR</span>';
+        } else {
+            return '<span class="badge detailed-hr">Detailed HR</span>';
+        }
+    }
+
+    createPowerBadge(powerDataType) {
+        const badgeMap = {
+            none: '<span class="badge no-power">No Power</span>',
+            basic: '<span class="badge basic-power">Basic Power</span>',
+            detailed:
+                '<span class="badge detailed-power">Detailed Power</span>',
+        };
+        return badgeMap[powerDataType] || "";
+    }
+
+    attachTooltipBehavior(el) {
+        let hideTimeout = null;
+
+        setTimeout(() => {
+            const tooltipEl = el.querySelector(".tooltip");
+            if (!tooltipEl) return;
+
+            el.addEventListener("mouseenter", () => {
+                if (hideTimeout) {
+                    clearTimeout(hideTimeout);
+                    hideTimeout = null;
+                }
+                tooltipEl.style.display = "block";
+                tooltipEl.style.pointerEvents = "auto";
+            });
+
+            el.addEventListener("mouseleave", (e) => {
+                const toElement = e.relatedTarget;
+                if (toElement && tooltipEl.contains(toElement)) return;
+
+                hideTimeout = setTimeout(() => {
+                    tooltipEl.style.display = "none";
+                }, 100);
+            });
+
+            tooltipEl.addEventListener("mouseenter", () => {
+                if (hideTimeout) {
+                    clearTimeout(hideTimeout);
+                    hideTimeout = null;
+                }
+                tooltipEl.style.pointerEvents = "auto";
+            });
+
+            tooltipEl.addEventListener("mouseleave", () => {
+                hideTimeout = setTimeout(() => {
+                    tooltipEl.style.display = "none";
+                }, 100);
+            });
+        }, 0);
+    }
+
+    // ==================== TOOLTIP CREATION ====================
+
+    createTooltip(activity, classification, sportType, intervalInfo) {
+        const sections = [
+            this.renderBasicInfo(
+                activity,
+                classification,
+                sportType,
+                intervalInfo
+            ),
+            this.renderSportSpecificMetrics(
+                activity,
+                classification,
+                sportType
+            ),
+            this.renderDetailedDataGraphs(activity, classification),
+            this.renderBasicDataFallback(activity, classification),
+        ].filter(Boolean);
+
+        return `<div class="tooltip">${sections.join("")}</div>`;
+    }
+
+    // ==================== BASIC INFO SECTION ====================
+
+    renderBasicInfo(activity, classification, sportType, intervalInfo) {
+        const duration = this.formatDuration(activity.duration ?? 0);
+        const distance = (activity.distance ?? 0).toFixed(2);
+
+        let html = `
+            <div class="tooltip-row">
+                <span class="tooltip-label">Type:</span>
+                <span class="tooltip-value">${classification.category}</span>
+            </div>
+            <div class="tooltip-row">
+                <span class="tooltip-label">Duration:</span>
+                <span class="tooltip-value">${duration}</span>
+            </div>
+            <div class="tooltip-row">
+                <span class="tooltip-label">Distance:</span>
+                <span class="tooltip-value">${distance} km</span>
+            </div>
+        `;
+
+        if (intervalInfo?.isInterval) {
+            html += this.renderIntervalInfo(intervalInfo);
+        }
+
+        html += this.renderSpeedOrPace(activity, sportType);
+
+        return html;
+    }
+
+    formatDuration(duration) {
+        const minutes = Math.floor(duration);
+        const seconds = Math.round((duration - minutes) * 60);
+        return `${minutes}:${seconds.toString().padStart(2, "0")} minutes`;
+    }
+
+    renderIntervalInfo(intervalInfo) {
+        return `
+            <div class="tooltip-row" style="background: rgba(251, 188, 4, 0.1); padding: 4px; border-radius: 4px; margin: 8px 0;">
+                <span class="tooltip-label">⚡ Intervals:</span>
+                <span class="tooltip-value">${intervalInfo.details}</span>
+            </div>
+        `;
+    }
+
+    renderSpeedOrPace(activity, sportType) {
         const avgSpeed = window.helpers.calculateAverageSpeed(activity);
         const avgPace = window.helpers.calculateAveragePace(activity);
+
         if (avgSpeed && sportType === "ride") {
-            html += `
-        <div class="tooltip-row">
-          <span class="tooltip-label">Avg Speed:</span>
-          <span class="tooltip-value">${avgSpeed.toFixed(1)} km/h</span>
-        </div>
-      `;
-        }
-        if (avgPace && sportType === "run") {
-            html += `
-        <div class="tooltip-row">
-          <span class="tooltip-label">Avg Pace:</span>
-          <span class="tooltip-value">${avgPace.toFixed(1)} km/h</span>
-        </div>
-      `;
+            return `
+                <div class="tooltip-row">
+                    <span class="tooltip-label">Avg Speed:</span>
+                    <span class="tooltip-value">${avgSpeed.toFixed(1)} km/h</span>
+                </div>
+            `;
         }
 
-        const ftp = window.powerAnalyzer?.getFTP() ?? 0;
-        const riderWeight = window.settingsManager.getWeight();
+        if (avgPace && sportType === "run") {
+            return `
+                <div class="tooltip-row">
+                    <span class="tooltip-label">Avg Pace:</span>
+                    <span class="tooltip-value">${avgPace.toFixed(1)} km/h</span>
+                </div>
+            `;
+        }
+
+        return "";
+    }
+
+    // ==================== SPORT-SPECIFIC METRICS ====================
+
+    renderSportSpecificMetrics(activity, classification, sportType) {
+        if (sportType === "run") {
+            return this.renderRunningMetrics(activity);
+        } else {
+            return this.renderCyclingMetrics(activity, classification);
+        }
+    }
+
+    // ==================== RUNNING METRICS ====================
+
+    renderRunningMetrics(activity) {
+        const thresholdPace = 5;
         const maxHR = window.settingsManager.getMaxHR();
         const restingHR = window.settingsManager.getRestingHR();
-        const thresholdPace = 5; //window.settingsManager.getThresholdPace();
 
-        // ===== RUNNING METRICS =====
-        if (sportType === "run") {
-            let runningMetrics = null;
-
-            // Calculate running metrics if we have the necessary data
-            if (activity.paceStream || activity.avgPace || activity.avgHR) {
-                runningMetrics =
-                    window.advancedRunningMetrics.calculateAllMetrics(
-                        activity,
-                        thresholdPace,
-                        maxHR,
-                        restingHR
-                    );
-            }
-
-            // Display running metrics
-            if (runningMetrics && Object.keys(runningMetrics).length > 0) {
-                html +=
-                    '<hr style="border:none;border-top:1px solid var(--border);margin:8px 0">';
-                html +=
-                    '<div style="font-weight:600;margin:8px 0;">Running Metrics</div>';
-
-                // rTSS or hrTSS (most important metric)
-                if (runningMetrics.rTSS) {
-                    html += `
-                <div class="tooltip-row highlight-metric">
-                  <span class="tooltip-label">rTSS:</span>
-                  <span class="tooltip-value">${runningMetrics.rTSS}</span>
-                </div>
-              `;
-                } else if (runningMetrics.hrTSS) {
-                    html += `
-                <div class="tooltip-row highlight-metric">
-                  <span class="tooltip-label">hrTSS:</span>
-                  <span class="tooltip-value">${runningMetrics.hrTSS} <span style="opacity:0.7;font-size:0.85em;">(HR-based)</span></span>
-                </div>
-              `;
-                }
-
-                // Normalized Graded Pace
-                if (runningMetrics.ngp) {
-                    const ngpMinutes = Math.floor(runningMetrics.ngp / 60);
-                    const ngpSeconds = Math.round(runningMetrics.ngp % 60);
-                    html += `
-                <div class="tooltip-row">
-                  <span class="tooltip-label">Normalized Pace:</span>
-                  <span class="tooltip-value">${ngpMinutes}:${ngpSeconds.toString().padStart(2, "0")} /km</span>
-                </div>
-              `;
-                }
-
-                // Pace Variability Index
-                if (runningMetrics.pvi) {
-                    const pviDescription =
-                        runningMetrics.pvi < 1.05
-                            ? "Steady"
-                            : runningMetrics.pvi < 1.1
-                              ? "Variable"
-                              : "Very Variable";
-                    html += `
-                <div class="tooltip-row">
-                  <span class="tooltip-label">Pace Variability:</span>
-                  <span class="tooltip-value">${runningMetrics.pvi.toFixed(2)} <span style="opacity:0.7;font-size:0.85em;">(${pviDescription})</span></span>
-                </div>
-              `;
-                }
-
-                // Efficiency Factor
-                if (runningMetrics.ef) {
-                    html += `
-                <div class="tooltip-row">
-                  <span class="tooltip-label">Efficiency Factor:</span>
-                  <span class="tooltip-value">${runningMetrics.ef.toFixed(2)}</span>
-                </div>
-              `;
-                }
-
-                // Aerobic Decoupling
-                if (
-                    runningMetrics.decoupling !== null &&
-                    runningMetrics.decoupling !== undefined
-                ) {
-                    html += `
-                <div class="tooltip-row">
-                  <span class="tooltip-label">Decoupling:</span>
-                  <span class="tooltip-value">${runningMetrics.decoupling.toFixed(1)}% <span style="opacity:0.7;font-size:0.85em;">(${runningMetrics.decouplingCategory})</span></span>
-                </div>
-              `;
-                }
-
-                // Running Dynamics Section
-                const hasDynamics =
-                    runningMetrics.avgCadence ||
-                    runningMetrics.avgStrideLength ||
-                    runningMetrics.avgVO ||
-                    runningMetrics.avgGCT ||
-                    runningMetrics.gctBalance;
-
-                if (hasDynamics) {
-                    html +=
-                        '<div style="font-weight:600;margin:12px 0 8px 0;">Running Dynamics</div>';
-
-                    // Cadence
-                    if (runningMetrics.avgCadence) {
-                        html += `
-                    <div class="tooltip-row">
-                      <span class="tooltip-label">Cadence:</span>
-                      <span class="tooltip-value">${runningMetrics.avgCadence} spm <span style="opacity:0.7;font-size:0.85em;">(${runningMetrics.cadenceCategory})</span></span>
-                    </div>
-                  `;
-                    }
-
-                    // Stride Length
-                    if (runningMetrics.avgStrideLength) {
-                        html += `
-                    <div class="tooltip-row">
-                      <span class="tooltip-label">Stride Length:</span>
-                      <span class="tooltip-value">${runningMetrics.avgStrideLength} m</span>
-                    </div>
-                  `;
-                    }
-
-                    // Vertical Oscillation
-                    if (runningMetrics.avgVO) {
-                        html += `
-                    <div class="tooltip-row">
-                      <span class="tooltip-label">Vert. Oscillation:</span>
-                      <span class="tooltip-value">${runningMetrics.avgVO} cm <span style="opacity:0.7;font-size:0.85em;">(${runningMetrics.voCategory})</span></span>
-                    </div>
-                  `;
-                    }
-
-                    // Ground Contact Time
-                    if (runningMetrics.avgGCT) {
-                        html += `
-                    <div class="tooltip-row">
-                      <span class="tooltip-label">Ground Contact:</span>
-                      <span class="tooltip-value">${runningMetrics.avgGCT} ms <span style="opacity:0.7;font-size:0.85em;">(${runningMetrics.gctCategory})</span></span>
-                    </div>
-                  `;
-                    }
-
-                    // Ground Contact Balance
-                    if (runningMetrics.gctBalance) {
-                        const balanceWarning =
-                            runningMetrics.gctBalance.imbalance > 2
-                                ? " ⚠️"
-                                : "";
-                        html += `
-                    <div class="tooltip-row">
-                      <span class="tooltip-label">GC Balance:</span>
-                      <span class="tooltip-value">${runningMetrics.gctBalance.avgLeft.toFixed(1)}% / ${runningMetrics.gctBalance.avgRight.toFixed(1)}%${balanceWarning}</span>
-                    </div>
-                  `;
-                    }
-                }
-            }
+        if (!activity.paceStream && !activity.avgPace && !activity.avgHR) {
+            return "";
         }
-        // ===== CYCLING METRICS =====
-        else {
-            // Calculate advanced metrics if power data is available
-            let advancedMetrics = null;
-            if (powerDataType !== "none" && activity.avgPower) {
-                advancedMetrics = window.advancedMetrics.calculateAllMetrics(
-                    activity,
-                    ftp,
-                    riderWeight
-                );
-            }
 
-            // Display advanced power metrics
+        const runningMetrics =
+            window.advancedRunningMetrics.calculateAllMetrics(
+                activity,
+                thresholdPace,
+                maxHR,
+                restingHR
+            );
+
+        if (!runningMetrics || Object.keys(runningMetrics).length === 0) {
+            return "";
+        }
+
+        return `
+            <hr style="border:none;border-top:1px solid var(--border);margin:8px 0">
+            <div style="font-weight:600;margin:8px 0;">Running Metrics</div>
+            ${this.renderRunningTrainingMetrics(runningMetrics)}
+            ${this.renderRunningDynamics(runningMetrics)}
+        `;
+    }
+
+    renderRunningTrainingMetrics(metrics) {
+        const parts = [];
+
+        // rTSS or hrTSS
+        if (metrics.rTSS) {
+            parts.push(this.renderMetricRow("rTSS", metrics.rTSS, true));
+        } else if (metrics.hrTSS) {
+            parts.push(
+                this.renderMetricRow(
+                    "hrTSS",
+                    `${metrics.hrTSS} <span style="opacity:0.7;font-size:0.85em;">(HR-based)</span>`,
+                    true
+                )
+            );
+        }
+
+        // Normalized Graded Pace
+        if (metrics.ngp) {
+            const ngpMinutes = Math.floor(metrics.ngp / 60);
+            const ngpSeconds = Math.round(metrics.ngp % 60);
+            parts.push(
+                this.renderMetricRow(
+                    "Normalized Pace",
+                    `${ngpMinutes}:${ngpSeconds.toString().padStart(2, "0")} /km`
+                )
+            );
+        }
+
+        // Pace Variability Index
+        if (metrics.pvi) {
+            const pviDescription =
+                metrics.pvi < 1.05
+                    ? "Steady"
+                    : metrics.pvi < 1.1
+                      ? "Variable"
+                      : "Very Variable";
+            parts.push(
+                this.renderMetricRow(
+                    "Pace Variability",
+                    `${metrics.pvi.toFixed(2)} <span style="opacity:0.7;font-size:0.85em;">(${pviDescription})</span>`
+                )
+            );
+        }
+
+        // Efficiency Factor
+        if (metrics.ef) {
+            parts.push(
+                this.renderMetricRow("Efficiency Factor", metrics.ef.toFixed(2))
+            );
+        }
+
+        // Aerobic Decoupling
+        if (metrics.decoupling !== null && metrics.decoupling !== undefined) {
+            parts.push(
+                this.renderMetricRow(
+                    "Decoupling",
+                    `${metrics.decoupling.toFixed(1)}% <span style="opacity:0.7;font-size:0.85em;">(${metrics.decouplingCategory})</span>`
+                )
+            );
+        }
+
+        return parts.join("");
+    }
+
+    renderRunningDynamics(metrics) {
+        const hasDynamics =
+            metrics.avgCadence ||
+            metrics.avgStrideLength ||
+            metrics.avgVO ||
+            metrics.avgGCT ||
+            metrics.gctBalance;
+
+        if (!hasDynamics) return "";
+
+        const parts = [
+            '<div style="font-weight:600;margin:12px 0 8px 0;">Running Dynamics</div>',
+        ];
+
+        if (metrics.avgCadence) {
+            parts.push(
+                this.renderMetricRow(
+                    "Cadence",
+                    `${metrics.avgCadence} spm <span style="opacity:0.7;font-size:0.85em;">(${metrics.cadenceCategory})</span>`
+                )
+            );
+        }
+
+        if (metrics.avgStrideLength) {
+            parts.push(
+                this.renderMetricRow(
+                    "Stride Length",
+                    `${metrics.avgStrideLength} m`
+                )
+            );
+        }
+
+        if (metrics.avgVO) {
+            parts.push(
+                this.renderMetricRow(
+                    "Vert. Oscillation",
+                    `${metrics.avgVO} cm <span style="opacity:0.7;font-size:0.85em;">(${metrics.voCategory})</span>`
+                )
+            );
+        }
+
+        if (metrics.avgGCT) {
+            parts.push(
+                this.renderMetricRow(
+                    "Ground Contact",
+                    `${metrics.avgGCT} ms <span style="opacity:0.7;font-size:0.85em;">(${metrics.gctCategory})</span>`
+                )
+            );
+        }
+
+        if (metrics.gctBalance) {
+            const balanceWarning =
+                metrics.gctBalance.imbalance > 2 ? " ⚠️" : "";
+            parts.push(
+                this.renderMetricRow(
+                    "GC Balance",
+                    `${metrics.gctBalance.avgLeft.toFixed(1)}% / ${metrics.gctBalance.avgRight.toFixed(1)}%${balanceWarning}`
+                )
+            );
+        }
+
+        return parts.join("");
+    }
+
+    // ==================== CYCLING METRICS ====================
+
+    renderCyclingMetrics(activity, classification) {
+        const { powerDataType } = classification;
+        const ftp = window.powerAnalyzer?.getFTP() ?? 0;
+        const riderWeight = window.settingsManager.getWeight();
+
+        // Try power-based metrics first
+        if (powerDataType !== "none" && activity.avgPower) {
+            const advancedMetrics = window.advancedMetrics.calculateAllMetrics(
+                activity,
+                ftp,
+                riderWeight
+            );
+
             if (advancedMetrics && Object.keys(advancedMetrics).length > 0) {
-                html +=
-                    '<hr style="border:none;border-top:1px solid var(--border);margin:8px 0">';
-                html +=
-                    '<div style="font-weight:600;margin:8px 0;">Training Metrics</div>';
-
-                // TSS (most important metric)
-                if (advancedMetrics.tss) {
-                    html += `
-                <div class="tooltip-row highlight-metric">
-                  <span class="tooltip-label">TSS:</span>
-                  <span class="tooltip-value">${advancedMetrics.tss} <span style="opacity:0.7;font-size:0.85em;">(${advancedMetrics.tssCategory})</span></span>
-                </div>
-              `;
-                }
-
-                // Intensity Factor
-                if (advancedMetrics.if) {
-                    html += `
-                <div class="tooltip-row">
-                  <span class="tooltip-label">Intensity Factor:</span>
-                  <span class="tooltip-value">${advancedMetrics.if.toFixed(2)} <span style="opacity:0.7;font-size:0.85em;">(${advancedMetrics.ifCategory})</span></span>
-                </div>
-              `;
-                }
-
-                // Normalized Power
-                if (advancedMetrics.np) {
-                    html += `
-                <div class="tooltip-row">
-                  <span class="tooltip-label">Normalized Power:</span>
-                  <span class="tooltip-value">${advancedMetrics.np} W</span>
-                </div>
-              `;
-                }
-
-                // Variability Index
-                if (advancedMetrics.vi) {
-                    const viDescription =
-                        advancedMetrics.vi < 1.05
-                            ? "Steady"
-                            : advancedMetrics.vi < 1.1
-                              ? "Variable"
-                              : "Very Variable";
-                    html += `
-                <div class="tooltip-row">
-                  <span class="tooltip-label">Variability:</span>
-                  <span class="tooltip-value">${advancedMetrics.vi.toFixed(2)} <span style="opacity:0.7;font-size:0.85em;">(${viDescription})</span></span>
-                </div>
-              `;
-                }
-
-                // Work (kJ)
-                if (advancedMetrics.work) {
-                    html += `
-                <div class="tooltip-row">
-                  <span class="tooltip-label">Work:</span>
-                  <span class="tooltip-value">${advancedMetrics.work} kJ <span style="opacity:0.7;font-size:0.85em;">(≈ ${advancedMetrics.work / 4.184} kcal)</span></span>
-                </div>
-              `;
-                }
-
-                // W/kg if weight is available
-                if (advancedMetrics.avgWkg) {
-                    html += `
-                <div class="tooltip-row">
-                  <span class="tooltip-label">Power/Weight:</span>
-                  <span class="tooltip-value">${advancedMetrics.avgWkg.toFixed(2)} W/kg</span>
-                </div>
-              `;
-                }
-
-                if (advancedMetrics.npWkg) {
-                    html += `
-                <div class="tooltip-row">
-                  <span class="tooltip-label">NP/Weight:</span>
-                  <span class="tooltip-value">${advancedMetrics.npWkg.toFixed(2)} W/kg</span>
-                </div>
-              `;
-                }
-            }
-            // HR-based TSS for rides without power
-            else if (
-                hrDataType !== "none" &&
-                activity.avgHR &&
-                activity.movingTime
-            ) {
-                const maxHR = window.hrAnalyzer?.getMaxHR() ?? 190;
-                const restingHR = window.hrAnalyzer?.getRestingHR() ?? 50;
-
-                const hrTSS = window.hrBasedMetrics.calculateHRTSS(
-                    activity.movingTime,
-                    activity.avgHR,
-                    maxHR,
-                    restingHR
-                );
-
-                if (hrTSS) {
-                    html +=
-                        '<hr style="border:none;border-top:1px solid var(--border);margin:8px 0">';
-                    html +=
-                        '<div style="font-weight:600;margin:8px 0;">Training Metrics</div>';
-                    html += `
-                <div class="tooltip-row highlight-metric">
-                  <span class="tooltip-label">hrTSS:</span>
-                  <span class="tooltip-value">${hrTSS} <span style="opacity:0.7;font-size:0.85em;">(HR-based)</span></span>
-                </div>
-              `;
-                }
+                return this.renderPowerBasedMetrics(advancedMetrics);
             }
         }
 
-        // Combined graph section (your existing code)
+        // Fall back to HR-based TSS
+        return this.renderHRBasedTSS(activity);
+    }
+
+    renderPowerBasedMetrics(metrics) {
+        const parts = [
+            '<hr style="border:none;border-top:1px solid var(--border);margin:8px 0">',
+            '<div style="font-weight:600;margin:8px 0;">Training Metrics</div>',
+        ];
+
+        // TSS
+        if (metrics.tss) {
+            parts.push(
+                this.renderMetricRow(
+                    "TSS",
+                    `${metrics.tss} <span style="opacity:0.7;font-size:0.85em;">(${metrics.tssCategory})</span>`,
+                    true
+                )
+            );
+        }
+
+        // Intensity Factor
+        if (metrics.if) {
+            parts.push(
+                this.renderMetricRow(
+                    "Intensity Factor",
+                    `${metrics.if.toFixed(2)} <span style="opacity:0.7;font-size:0.85em;">(${metrics.ifCategory})</span>`
+                )
+            );
+        }
+
+        // Normalized Power
+        if (metrics.np) {
+            parts.push(
+                this.renderMetricRow("Normalized Power", `${metrics.np} W`)
+            );
+        }
+
+        // Variability Index
+        if (metrics.vi) {
+            const viDescription =
+                metrics.vi < 1.05
+                    ? "Steady"
+                    : metrics.vi < 1.1
+                      ? "Variable"
+                      : "Very Variable";
+            parts.push(
+                this.renderMetricRow(
+                    "Variability",
+                    `${metrics.vi.toFixed(2)} <span style="opacity:0.7;font-size:0.85em;">(${viDescription})</span>`
+                )
+            );
+        }
+
+        // Work
+        if (metrics.work) {
+            parts.push(
+                this.renderMetricRow(
+                    "Work",
+                    `${metrics.work} kJ <span style="opacity:0.7;font-size:0.85em;">(≈ ${Math.round(metrics.work / 4.184)} kcal)</span>`
+                )
+            );
+        }
+
+        // W/kg
+        if (metrics.avgWkg) {
+            parts.push(
+                this.renderMetricRow(
+                    "Power/Weight",
+                    `${metrics.avgWkg.toFixed(2)} W/kg`
+                )
+            );
+        }
+
+        if (metrics.npWkg) {
+            parts.push(
+                this.renderMetricRow(
+                    "NP/Weight",
+                    `${metrics.npWkg.toFixed(2)} W/kg`
+                )
+            );
+        }
+
+        return parts.join("");
+    }
+
+    renderHRBasedTSS(activity) {
+        const { hrDataType } = this.getDataTypes(activity);
+
+        if (hrDataType === "none" || !activity.avgHR || !activity.movingTime) {
+            return "";
+        }
+
+        const maxHR = window.hrAnalyzer?.getMaxHR() ?? 190;
+        const restingHR = window.hrAnalyzer?.getRestingHR() ?? 50;
+
+        const hrTSS = window.hrBasedMetrics.calculateHRTSS(
+            activity.movingTime,
+            activity.avgHR,
+            maxHR,
+            restingHR
+        );
+
+        if (!hrTSS) return "";
+
+        return `
+            <hr style="border:none;border-top:1px solid var(--border);margin:8px 0">
+            <div style="font-weight:600;margin:8px 0;">Training Metrics</div>
+            ${this.renderMetricRow("hrTSS", `${hrTSS} <span style="opacity:0.7;font-size:0.85em;">(HR-based)</span>`, true)}
+        `;
+    }
+
+    renderMetricRow(label, value, highlight = false) {
+        const className = highlight
+            ? "tooltip-row highlight-metric"
+            : "tooltip-row";
+        return `
+            <div class="${className}">
+                <span class="tooltip-label">${label}:</span>
+                <span class="tooltip-value">${value}</span>
+            </div>
+        `;
+    }
+
+    // ==================== DETAILED DATA GRAPHS ====================
+
+    renderDetailedDataGraphs(activity, classification) {
+        const { hrDataType, detailedHR, powerDataType, detailedPower } =
+            classification;
+
         const hasDetailedHR = hrDataType === "detailed" && detailedHR;
         const hasDetailedPower = powerDataType === "detailed" && detailedPower;
 
-        if (hasDetailedHR || hasDetailedPower) {
-            html +=
-                '<hr style="border:none;border-top:1px solid var(--border);margin:8px 0">';
+        if (!hasDetailedHR && !hasDetailedPower) {
+            return "";
+        }
 
-            // Always show graph when detailed data is available
-            if (
-                hasDetailedHR &&
-                hasDetailedPower &&
-                activity.powerStream &&
-                activity.hrStream
-            ) {
-                // Combined HR+Power graph
-                html += window.powerAnalyzer.generateHRPowerGraph(
-                    activity.hrStream,
-                    activity.powerStream
-                );
-            } else if (
-                hasDetailedHR &&
-                activity.hrStream &&
-                activity.paceStream
-            ) {
-                html +=
-                    '<hr style="border:none;border-top:1px solid var(--border);margin:8px 0">';
-                html += window.hrAnalyzer.generateHRGraph(
-                    detailedHR.hrRecords,
-                    activity.paceStream.pace
-                );
-            } else if (hasDetailedHR && activity.hrStream) {
-                // Just HR graph without power
-                html += window.hrAnalyzer.generateHRGraph(detailedHR.hrRecords);
-            } else if (hasDetailedPower && activity.powerStream) {
-                // Just power graph without HR
-                html += window.powerAnalyzer.generatePowerGraph(
-                    activity.powerStream
+        return `
+            <hr style="border:none;border-top:1px solid var(--border);margin:8px 0">
+            ${this.renderGraphs(activity, hasDetailedHR, hasDetailedPower)}
+            ${this.renderZoneDoughnuts(activity, hasDetailedHR, hasDetailedPower, detailedHR, detailedPower)}
+        `;
+    }
+
+    renderGraphs(activity, hasDetailedHR, hasDetailedPower) {
+        // Combined HR+Power graph
+        if (
+            hasDetailedHR &&
+            hasDetailedPower &&
+            activity.powerStream &&
+            activity.hrStream
+        ) {
+            return window.powerAnalyzer.generateHRPowerGraph(
+                activity.hrStream,
+                activity.powerStream
+            );
+        }
+
+        // HR + Pace graph
+        if (hasDetailedHR && activity.hrStream && activity.paceStream) {
+            return window.hrAnalyzer.generateHRGraph(
+                activity.hrStream.heartrate,
+                activity.paceStream.pace
+            );
+        }
+
+        // Just HR graph
+        if (hasDetailedHR && activity.hrStream) {
+            return window.hrAnalyzer.generateHRGraph(activity.hrStream);
+        }
+
+        // Just power graph
+        if (hasDetailedPower && activity.powerStream) {
+            return window.powerAnalyzer.generatePowerGraph(
+                activity.powerStream
+            );
+        }
+
+        return "";
+    }
+
+    renderZoneDoughnuts(
+        activity,
+        hasDetailedHR,
+        hasDetailedPower,
+        detailedHR,
+        detailedPower
+    ) {
+        if (hasDetailedHR && hasDetailedPower) {
+            return `
+                <div style="font-weight:600;margin:16px 0 8px 0;">Zone Distribution</div>
+                <div style="display:flex;gap:24px;justify-content:center;flex-wrap:wrap;">
+                    <div style="flex:1;min-width:250px;max-width:400px;">
+                        <div style="font-weight:600;margin-bottom:8px;text-align:center;color:#ea4335;">Heart Rate</div>
+                        ${window.hrAnalyzer.generateHRZoneDoughnut(detailedHR)}
+                    </div>
+                    <div style="flex:1;min-width:250px;max-width:400px;">
+                        <div style="font-weight:600;margin-bottom:8px;text-align:center;color:#4285f4;">Power</div>
+                        ${window.powerAnalyzer.generatePowerZoneDoughnut(detailedPower)}
+                    </div>
+                </div>
+            `;
+        }
+
+        if (hasDetailedHR) {
+            return `
+                <div style="font-weight:600;margin:16px 0 8px 0;">Heart Rate Distribution</div>
+                ${window.hrAnalyzer.generateHRZoneDoughnut(detailedHR)}
+            `;
+        }
+
+        if (hasDetailedPower) {
+            return `
+                <div style="font-weight:600;margin:16px 0 8px 0;">Power Distribution</div>
+                ${window.powerAnalyzer.generatePowerZoneDoughnut(detailedPower)}
+            `;
+        }
+
+        return "";
+    }
+
+    // ==================== BASIC DATA FALLBACK ====================
+
+    renderBasicDataFallback(activity, classification) {
+        const { hrDataType, powerDataType } = classification;
+        const parts = [];
+
+        // Only show basic data if no detailed data was shown
+        const hasDetailedHR = hrDataType === "detailed";
+        const hasDetailedPower = powerDataType === "detailed";
+
+        if (!hasDetailedHR) {
+            if (hrDataType === "basic") {
+                parts.push(this.renderBasicHR(activity));
+            } else if (hrDataType === "none") {
+                parts.push(
+                    this.renderMetricRow(
+                        "HR Data",
+                        '<span style="color:#ea4335">Not available</span>'
+                    )
                 );
             }
+        }
 
-            // Display doughnuts side by side if both exist
-            if (hasDetailedHR && hasDetailedPower) {
-                html +=
-                    '<div style="font-weight:600;margin:16px 0 8px 0;">Zone Distribution</div>';
-                html +=
-                    '<div style="display:flex;gap:24px;justify-content:center;flex-wrap:wrap;">';
-                html += '<div style="flex:1;min-width:250px;max-width:400px;">';
-                html +=
-                    '<div style="font-weight:600;margin-bottom:8px;text-align:center;color:#ea4335;">Heart Rate</div>';
-                html += window.hrAnalyzer.generateHRZoneDoughnut(detailedHR);
-                html += "</div>";
-                html += '<div style="flex:1;min-width:250px;max-width:400px;">';
-                html +=
-                    '<div style="font-weight:600;margin-bottom:8px;text-align:center;color:#4285f4;">Power</div>';
-                html +=
-                    window.powerAnalyzer.generatePowerZoneDoughnut(
-                        detailedPower
-                    );
-                html += "</div>";
-                html += "</div>";
-            } else if (hasDetailedHR) {
-                html +=
-                    '<div style="font-weight:600;margin:16px 0 8px 0;">Heart Rate Distribution</div>';
-                html += window.hrAnalyzer.generateHRZoneDoughnut(detailedHR);
-            } else if (hasDetailedPower) {
-                html +=
-                    '<div style="font-weight:600;margin:16px 0 8px 0;">Power Distribution</div>';
-                html +=
-                    window.powerAnalyzer.generatePowerZoneDoughnut(
-                        detailedPower
-                    );
+        if (!hasDetailedPower && !hasDetailedHR) {
+            if (powerDataType === "basic") {
+                parts.push(this.renderBasicPower(activity));
+            } else if (powerDataType === "none" && hrDataType !== "none") {
+                parts.push(
+                    this.renderMetricRow(
+                        "Power Data",
+                        '<span style="color:#ea4335">Not available</span>'
+                    )
+                );
             }
         }
 
-        // Basic HR data (your existing code)
-        if (hrDataType === "basic") {
-            const zone = window.hrAnalyzer?.getZone(activity.avgHR) || "?";
-            html += `
-        <div class="tooltip-row">
-          <span class="tooltip-label">Avg HR:</span>
-          <span class="tooltip-value">${activity.avgHR} bpm (Zone ${zone})</span>
-        </div>
-        <div class="tooltip-row">
-          <span class="tooltip-label">Max HR:</span>
-          <span class="tooltip-value">${activity.maxHR} bpm</span>
-        </div>
-      `;
-        } else if (hrDataType === "none") {
-            html += `
-        <div class="tooltip-row">
-          <span class="tooltip-label">HR Data:</span>
-          <span class="tooltip-value" style="color:#ea4335">Not available</span>
-        </div>
-      `;
-        }
+        return parts.join("");
+    }
 
-        // Basic Power data (your existing code)
-        if (powerDataType === "basic") {
-            const zone = this.getPowerZone(activity.avgWatts, ftp);
-            html += `
-        <div class="tooltip-row">
-          <span class="tooltip-label">Avg Power:</span>
-          <span class="tooltip-value">${activity.avgWatts} W (Zone ${zone})</span>
-        </div>
-        <div class="tooltip-row">
-          <span class="tooltip-label">Max Power:</span>
-          <span class="tooltip-value">${activity.maxWatts} W</span>
-        </div>
-      `;
-        } else if (powerDataType === "none" && hrDataType !== "none") {
-            html += `
-        <div class="tooltip-row">
-          <span class="tooltip-label">Power Data:</span>
-          <span class="tooltip-value" style="color:#ea4335">Not available</span>
-        </div>
-      `;
-        }
+    renderBasicHR(activity) {
+        const zone = window.hrAnalyzer?.getZone(activity.avgHR) || "?";
+        return `
+            ${this.renderMetricRow("Avg HR", `${activity.avgHR} bpm (Zone ${zone})`)}
+            ${this.renderMetricRow("Max HR", `${activity.maxHR} bpm`)}
+        `;
+    }
 
-        html += "</div>";
-        return html;
+    renderBasicPower(activity) {
+        const ftp = window.powerAnalyzer?.getFTP() ?? 0;
+        const zone = this.getPowerZone(activity.avgWatts, ftp);
+        return `
+            ${this.renderMetricRow("Avg Power", `${activity.avgWatts} W (Zone ${zone})`)}
+            ${this.renderMetricRow("Max Power", `${activity.maxWatts} W`)}
+        `;
+    }
+
+    // ==================== HELPER METHODS ====================
+
+    getDataTypes(activity) {
+        return {
+            hrDataType: !activity.avgHR
+                ? "none"
+                : !activity.hrStream
+                  ? "basic"
+                  : "detailed",
+            powerDataType: !activity.avgPower
+                ? "none"
+                : !activity.powerStream
+                  ? "basic"
+                  : "detailed",
+        };
     }
 
     getPowerZone(watts, ftp) {

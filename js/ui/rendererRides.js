@@ -5,21 +5,6 @@ class RideRenderer {
         this.chart = null;
     }
 
-    /* ---------------- Small UI helpers ---------------- */
-
-    _setText(id, value) {
-        const el = document.getElementById(id);
-        if (!el) return;
-        el.textContent = value ?? "—";
-    }
-
-    _setKm(id, value) {
-        const el = document.getElementById(id);
-        if (!el) return;
-        const num = Number(value ?? 0);
-        el.textContent = `${num.toFixed(1)} km`;
-    }
-
     /* ---------------- Basic info (RIDES) ---------------- */
 
     renderBasicInfo(summary) {
@@ -70,6 +55,21 @@ class RideRenderer {
             "ride"
         );
         window.intensityChart.renderChart(activities || [], "ride");
+    }
+
+    /* ---------------- Small UI helpers ---------------- */
+
+    _setText(id, value) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = value ?? "—";
+    }
+
+    _setKm(id, value) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const num = Number(value ?? 0);
+        el.textContent = `${num.toFixed(1)} km`;
     }
 }
 

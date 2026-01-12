@@ -196,29 +196,29 @@
             <div id="feedbackMessage"></div>
             
 
-  <form id="stravaAuthForm" autocomplete="off">
-    <h2>Connect to Strava</h2>
+              <form id="stravaAuthForm" autocomplete="off">
+                <h2>Connect to Strava</h2>
     
-    <label for="clientId">Strava Client ID</label>
-    <input
-      type="text"
-      id="clientId"
-      name="clientId"
-      placeholder="Enter your Strava Client ID"
-      autocomplete="off"
-      required
-    />
+                <label for="clientId">Strava Client ID</label>
+                <input
+                  type="text"
+                  id="clientId"
+                  name="clientId"
+                  placeholder="Enter your Strava Client ID"
+                  autocomplete="off"
+                  required
+                />
 
-    <label for="clientSecret">Strava Client Secret</label>
-    <input
-      type="password"
-      id="clientSecret"
-      name="clientSecret"
-      placeholder="Enter your Strava Client Secret"
-      autocomplete="new-password"
-      required
-    />
-  </form>
+                <label for="clientSecret">Strava Client Secret</label>
+                <input
+                  type="password"
+                  id="clientSecret"
+                  name="clientSecret"
+                  placeholder="Enter your Strava Client Secret"
+                  autocomplete="new-password"
+                  required
+                />
+              </form>
 
             
             <button id="connectBtn" onclick="initiateAuth()">Connect to Strava</button>
@@ -635,7 +635,7 @@
               <div class="value" id="restDays">—</div>
             </div>
           </div>
-          <div id="trainingLoadAnalysis"></div>
+          <div id="runTrainingLoadAnalysis"></div>
         </div>
 
         <!-- Average Weekly Distance Chart -->
@@ -681,7 +681,7 @@
               <div class="value" id="restDaysRide">—</div>
             </div>
           </div>
-          <div id="trainingLoadAnalysisRide"></div>
+          <div id="rideTrainingLoadAnalysis"></div>
         </div>
 
         <div class="panel">
@@ -724,7 +724,7 @@
               <div class="value" id="restDaysSwim">—</div>
             </div>
           </div>
-          <div id="trainingLoadAnalysisSwim"></div>
+          <div id="swimTrainingLoadAnalysis"></div>
         </div>
 
         <div class="panel">

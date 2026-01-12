@@ -68,7 +68,7 @@ class TriRunalyzer {
 
         if (totalActivities > 0) {
             window.feedbackManager.showSessionBanner(totalActivities, "zip");
-            this.analyze();
+            this.analyze("all");
         }
 
         // Setup navigation
@@ -203,7 +203,11 @@ class TriRunalyzer {
         console.log(`📊 Analyzing ${targetSport} data...`);
 
         try {
-            if (targetSport === "run") {
+            if (targetSport === "all") {
+                this.analyzeRuns();
+                this.analyzeRides();
+                this.analyzeSwims();
+            } else if (targetSport === "run") {
                 this.analyzeRuns();
             } else if (targetSport === "ride") {
                 this.analyzeRides();
@@ -246,7 +250,7 @@ class TriRunalyzer {
         window.runRenderer.renderBasicInfo(summaryRuns);
         window.runRenderer.renderCharts(runs);
         window.timelineChart.renderChart(runs, "run");
-        window.trainingLoadAnalyzer.renderTrainingLoadAnalysis(runs);
+        window.trainingLoadAnalyzer.renderTrainingLoadAnalysis(runs, "run");
     }
 
     /**
@@ -274,7 +278,7 @@ class TriRunalyzer {
         window.rideRenderer.renderBasicInfo(summaryRides);
         window.rideRenderer.renderCharts(rides);
         window.timelineChart.renderChart(rides, "ride");
-        window.trainingLoadAnalyzer.renderTrainingLoadAnalysis(rides);
+        window.trainingLoadAnalyzer.renderTrainingLoadAnalysis(rides, "ride");
     }
 
     /**
@@ -294,7 +298,7 @@ class TriRunalyzer {
         window.swimRenderer.renderBasicInfo(summarySwims);
         window.swimRenderer.renderCharts(swims);
         window.timelineChart.renderChart(swims, "swims");
-        window.trainingLoadAnalyzer.renderTrainingLoadAnalysis(swims);
+        window.trainingLoadAnalyzer.renderTrainingLoadAnalysis(swims, "swims");
     }
 }
 

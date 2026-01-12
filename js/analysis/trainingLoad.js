@@ -429,13 +429,15 @@ After a race effort, plan at least 2 easy days before the next hard workout.
         return consecutiveDays || sorted.length;
     }
 
-    renderTrainingLoadAnalysis(activities) {
-        const container = document.getElementById("trainingLoadAnalysisRide");
+    renderTrainingLoadAnalysis(activities, sportType) {
+        const container = document.getElementById(
+            `${sportType}TrainingLoadAnalysis`
+        );
         if (!container) return;
 
         const analysis = window.trainingLoadAnalyzer.analyze(
             activities || [],
-            "ride"
+            sportType
         );
 
         const statusIcon = { green: "🟢", yellow: "🟡", red: "🔴" };
