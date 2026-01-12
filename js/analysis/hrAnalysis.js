@@ -21,11 +21,11 @@ class HRAnalyzer {
     }
 
     getMaxHR() {
-        return window.userSettings.getMaxHR();
+        return window.settingsManager.getMaxHR();
     }
 
     getRestingHR() {
-        return window.userSettings.getRestingHR();
+        return window.settingsManager.getRestingHR();
     }
 
     /**

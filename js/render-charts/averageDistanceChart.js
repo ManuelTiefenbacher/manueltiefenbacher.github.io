@@ -163,9 +163,6 @@ class AverageDistanceChart {
             suggestedMaxMetric = Math.ceil((maxMetric + 0.2) * 10) / 10;
         }
 
-        console.log("weeklyData sample:", weeklyData.slice(0, 3));
-        console.log("metricValues:", metricValues);
-
         datasets.push({
             type: "line",
             label: config.metricLabel,
