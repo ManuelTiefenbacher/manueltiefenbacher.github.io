@@ -251,6 +251,7 @@ class TriRunalyzer {
         window.runRenderer.renderCharts(runs);
         window.timelineChart.renderChart(runs, "run");
         window.trainingLoadAnalyzer.renderTrainingLoadAnalysis(runs, "run");
+        initializeChartToggles("run");
     }
 
     /**
@@ -279,6 +280,7 @@ class TriRunalyzer {
         window.rideRenderer.renderCharts(rides);
         window.timelineChart.renderChart(rides, "ride");
         window.trainingLoadAnalyzer.renderTrainingLoadAnalysis(rides, "ride");
+        initializeChartToggles("ride");
     }
 
     /**
@@ -299,6 +301,7 @@ class TriRunalyzer {
         window.swimRenderer.renderCharts(swims);
         window.timelineChart.renderChart(swims, "swims");
         window.trainingLoadAnalyzer.renderTrainingLoadAnalysis(swims, "swims");
+        initializeChartToggles("swim");
     }
 }
 
@@ -350,3 +353,132 @@ window.app = new TriRunalyzer();
 document.addEventListener("DOMContentLoaded", async () => {
     await window.app.init();
 });
+
+function initializeChartToggles(sportType) {
+    const container = document.getElementById(`analysis-${sportType}`);
+    if (!container) return;
+
+    // Find the overview panel (first panel)
+    const overviewPanel = container.querySelector(".panel");
+    if (!overviewPanel) return;
+
+    // Remove existing toggle container if present
+    const existingToggle = overviewPanel.querySelector(
+        ".chart-toggle-container"
+    );
+    if (existingToggle) {
+        existingToggle.remove();
+    }
+
+    // Create toggle controls
+    const toggleContainer = document.createElement("div");
+    toggleContainer.className = "chart-toggle-container";
+    toggleContainer.style.cssText =
+        "margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e5e7eb;";
+
+    const toggleTitle = document.createElement("div");
+    toggleTitle.textContent = "Show Charts:";
+    toggleTitle.style.cssText =
+        "font-weight: 600; margin-bottom: 0.5rem; color: #374151;";
+
+    const checkboxContainer = document.createElement("div");
+    checkboxContainer.style.cssText =
+        "display: flex; flex-wrap: wrap; gap: 0.5rem;";
+
+    // Define charts to toggle
+    const charts = [
+        {
+            id: "trainingLoad",
+            label: "Training Load",
+            panelSelector: (p) =>
+                p
+                    .querySelector("h2")
+                    ?.textContent.includes("Training Load Analysis"),
+        },
+        {
+            id: "avgDistance",
+            label: "Average Weekly Distance",
+            panelSelector: (p) =>
+                p
+                    .querySelector("h2")
+                    ?.textContent.includes("Average Weekly Distance"),
+        },
+        {
+            id: "intensity",
+            label: "Intensity",
+            panelSelector: (p) =>
+                p.querySelector("h2")?.textContent.includes("Intensity"),
+        },
+        {
+            id: "timeline",
+            label: "Activity Timeline",
+            panelSelector: (p) =>
+                p
+                    .querySelector("h2")
+                    ?.textContent.includes("Previous Four Weeks"),
+        },
+    ];
+
+    // Track active state for each chart
+    const chartStates = {};
+
+    charts.forEach((chart) => {
+        chartStates[chart.id] = true; // All visible by default
+
+        const button = document.createElement("button");
+        button.textContent = chart.label;
+        button.id = `toggle-${sportType}-${chart.id}`;
+
+        const updateButtonStyle = (isActive) => {
+            button.style.cssText = `padding: 8px 16px; border: 1px solid #5f6368; border-radius: 4px; background: ${isActive ? "#4285f4" : "transparent"}; color: ${isActive ? "#fff" : "#e8eaed"}; cursor: pointer; font-size: 13px; font-family: system-ui, -apple-system, sans-serif; transition: all 0.2s;`;
+        };
+
+        updateButtonStyle(true);
+
+        // Handle toggle
+        button.addEventListener("click", () => {
+            chartStates[chart.id] = !chartStates[chart.id];
+            updateButtonStyle(chartStates[chart.id]);
+
+            let element;
+
+            if (chart.panelSelector) {
+                // Find panel by checking h2 content
+                const panels = container.querySelectorAll(".panel");
+                for (let panel of panels) {
+                    if (chart.panelSelector(panel)) {
+                        element = panel;
+                        break;
+                    }
+                }
+            }
+
+            if (element) {
+                element.style.display = chartStates[chart.id] ? "" : "none";
+            }
+        });
+
+        button.addEventListener("mouseenter", () => {
+            if (!chartStates[chart.id]) {
+                button.style.background = "rgba(66, 133, 244, 0.1)";
+            }
+        });
+
+        button.addEventListener("mouseleave", () => {
+            if (!chartStates[chart.id]) {
+                button.style.background = "transparent";
+            }
+        });
+
+        checkboxContainer.appendChild(button);
+    });
+
+    toggleContainer.appendChild(toggleTitle);
+    toggleContainer.appendChild(checkboxContainer);
+
+    // Insert after the stats div
+    const statsDiv = overviewPanel.querySelector(".stats");
+    if (statsDiv) {
+        statsDiv.after(toggleContainer);
+    }
+}

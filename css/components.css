@@ -254,7 +254,7 @@
 .stats {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 16px;
+    gap: 8px;
     margin: 1.5rem 0;
 }
 
@@ -282,8 +282,8 @@
 }
 
 .stat .value {
-    font-size: 1.75rem;
-    font-weight: 700;
+    font-size: 1.25rem;
+    font-weight: 500;
     letter-spacing: -0.02em;
     color: var(--text);
 }

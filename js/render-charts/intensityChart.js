@@ -1,9 +1,178 @@
 class IntensityChart {
     constructor() {
         this.chart = null;
+        this.currentPeriod = 28; // Default to 4 weeks
+        this.periodPresets = [
+            { label: "1 Week", days: 7 },
+            { label: "2 Weeks", days: 14 },
+            { label: "4 Weeks", days: 28 },
+            { label: "8 Weeks", days: 56 },
+            { label: "3 Months", days: 90 },
+            { label: "6 Months", days: 180 },
+        ];
+    }
+
+    // Create period selector buttons
+    createPeriodSelector(sportType = "ride") {
+        const containerId = `periodSelector${sportType.charAt(0).toUpperCase() + sportType.slice(1)}`;
+        let container = document.getElementById(containerId);
+
+        if (!container) {
+            // Create container if it doesn't exist
+            const chartCanvas = document.getElementById(
+                `intensityChart${sportType.charAt(0).toUpperCase() + sportType.slice(1)}`
+            );
+            if (!chartCanvas) return;
+
+            container = document.createElement("div");
+            container.id = containerId;
+            container.className = "period-selector";
+            container.style.cssText =
+                "display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; justify-content: center; align-items: center;";
+
+            chartCanvas.parentNode.insertBefore(container, chartCanvas);
+        }
+
+        container.innerHTML = "";
+
+        // Check if current period is a preset
+        const isPreset = this.periodPresets.some(
+            (p) => p.days === this.currentPeriod
+        );
+
+        this.periodPresets.forEach((preset) => {
+            const button = document.createElement("button");
+            button.textContent = preset.label;
+            button.className = "period-button";
+            button.style.cssText = `
+                padding: 8px 16px;
+                border: 1px solid #5f6368;
+                border-radius: 4px;
+                background: ${this.currentPeriod === preset.days ? "#4285f4" : "transparent"};
+                color: ${this.currentPeriod === preset.days ? "#fff" : "#e8eaed"};
+                cursor: pointer;
+                font-size: 13px;
+                font-family: system-ui, -apple-system, sans-serif;
+                transition: all 0.2s;
+            `;
+
+            button.addEventListener("mouseenter", () => {
+                if (this.currentPeriod !== preset.days) {
+                    button.style.background = "rgba(66, 133, 244, 0.1)";
+                }
+            });
+
+            button.addEventListener("mouseleave", () => {
+                if (this.currentPeriod !== preset.days) {
+                    button.style.background = "transparent";
+                }
+            });
+
+            button.addEventListener("click", () => {
+                this.currentPeriod = preset.days;
+                this.createPeriodSelector(sportType); // Refresh buttons
+                this.renderChart(null, sportType); // Re-render chart
+            });
+
+            container.appendChild(button);
+        });
+
+        // Add custom input field
+        const customWrapper = document.createElement("div");
+        customWrapper.style.cssText =
+            "display: flex; gap: 4px; align-items: center;";
+
+        const customLabel = document.createElement("span");
+        customLabel.textContent = "Custom:";
+        customLabel.style.cssText = `
+            color: #e8eaed;
+            font-size: 13px;
+            font-family: system-ui, -apple-system, sans-serif;
+        `;
+
+        const customInput = document.createElement("input");
+        customInput.type = "number";
+        customInput.min = "1";
+        customInput.max = "365";
+        customInput.placeholder = "Days";
+        customInput.style.cssText = `
+            width: 70px;
+            padding: 8px 12px;
+            border: 1px solid #5f6368;
+            border-radius: 4px;
+            background: ${!isPreset ? "#4285f4" : "transparent"};
+            color: #e8eaed;
+            font-size: 13px;
+            font-family: system-ui, -apple-system, sans-serif;
+            text-align: center;
+        `;
+
+        if (!isPreset) {
+            customInput.value = this.currentPeriod;
+        }
+
+        const daysLabel = document.createElement("span");
+        daysLabel.style.cssText = `
+            color: #e8eaed;
+            font-size: 13px;
+            font-family: system-ui, -apple-system, sans-serif;
+        `;
+
+        const applyButton = document.createElement("button");
+        applyButton.textContent = "Apply";
+        applyButton.style.cssText = `
+            padding: 8px 16px;
+            border: 1px solid #5f6368;
+            border-radius: 4px;
+            background: transparent;
+            color: #e8eaed;
+            cursor: pointer;
+            font-size: 13px;
+            font-family: system-ui, -apple-system, sans-serif;
+            transition: all 0.2s;
+        `;
+
+        applyButton.addEventListener("mouseenter", () => {
+            applyButton.style.background = "rgba(66, 133, 244, 0.1)";
+        });
+
+        applyButton.addEventListener("mouseleave", () => {
+            applyButton.style.background = "transparent";
+        });
+
+        const applyCustomPeriod = () => {
+            const days = parseInt(customInput.value);
+            if (days && days > 0 && days <= 365) {
+                this.currentPeriod = days;
+                this.createPeriodSelector(sportType);
+                this.renderChart(null, sportType);
+            } else {
+                customInput.style.borderColor = "#ea4335";
+                setTimeout(() => {
+                    customInput.style.borderColor = "#5f6368";
+                }, 1000);
+            }
+        };
+
+        applyButton.addEventListener("click", applyCustomPeriod);
+
+        customInput.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") {
+                applyCustomPeriod();
+            }
+        });
+
+        customWrapper.appendChild(customLabel);
+        customWrapper.appendChild(customInput);
+        customWrapper.appendChild(daysLabel);
+        customWrapper.appendChild(applyButton);
+        container.appendChild(customWrapper);
     }
 
     renderChart(activities, sportType = "ride") {
+        // Create period selector if it doesn't exist
+        this.createPeriodSelector(sportType);
+
         const canvasId = `intensityChart${sportType.charAt(0).toUpperCase() + sportType.slice(1)}`;
         const canvas = document.getElementById(canvasId);
         if (!canvas) return;
@@ -12,9 +181,8 @@ class IntensityChart {
         const existing = Chart.getChart(canvas);
         if (existing) existing.destroy();
 
-        const chartSettings = window.settingsManager.getChartRanges();
-        const weeksToShow = chartSettings.intensityChartWeeks;
-        const daysToShow = weeksToShow * 7;
+        const daysToShow = this.currentPeriod;
+        const weeksLabel = this.getPeriodLabel(daysToShow);
 
         // Determine the appropriate method and renderer based on sport type
         const methodMap = {
@@ -61,7 +229,7 @@ class IntensityChart {
             ctx.fillStyle = "#9aa0a6";
             ctx.textAlign = "center";
             ctx.fillText(
-                `No detailed ${sportType} data available for the last ${weeksToShow} week${weeksToShow !== 1 ? "s" : ""}`,
+                `No detailed ${sportType} data available for ${weeksLabel}`,
                 canvas.width / 2,
                 canvas.height / 2
             );
@@ -136,7 +304,7 @@ class IntensityChart {
                 labels,
                 datasets: [
                     {
-                        label: `Previous ${weeksToShow} week${weeksToShow !== 1 ? "s" : ""}`,
+                        label: `Previous ${weeksLabel}`,
                         data: previousData,
                         backgroundColor: "rgba(156, 163, 175, 0.15)",
                         borderColor: "rgba(156, 163, 175, 0.5)",
@@ -149,7 +317,7 @@ class IntensityChart {
                         order: 2,
                     },
                     {
-                        label: `Current ${weeksToShow} week${weeksToShow !== 1 ? "s" : ""}`,
+                        label: `Current ${weeksLabel}`,
                         data: currentData,
                         backgroundColor: "rgba(66, 133, 244, 0.2)",
                         borderColor: "rgba(66, 133, 244, 0.8)",
@@ -181,7 +349,12 @@ class IntensityChart {
                                 size: 11,
                                 family: "system-ui, -apple-system, sans-serif",
                             },
-                            callback: (value) => value.toFixed(0) + "%",
+                            callback: (value, index) => {
+                                // Only show label on every second tick (even indices)
+                                return index % 2 === 0
+                                    ? value.toFixed(0) + "%"
+                                    : "";
+                            },
                         },
                         grid: {
                             color: "rgba(128, 128, 128, 0.2)",
@@ -265,6 +438,23 @@ class IntensityChart {
                 },
             },
         });
+    }
+
+    // Helper to get human-readable period label
+    getPeriodLabel(days) {
+        if (days === 7) return "1 week";
+        if (days === 14) return "2 weeks";
+        if (days === 28) return "4 weeks";
+        if (days === 56) return "8 weeks";
+        if (days === 90) return "3 months";
+        if (days === 180) return "6 months";
+
+        // Fallback for custom periods
+        if (days % 7 === 0) {
+            const weeks = days / 7;
+            return `${weeks} week${weeks !== 1 ? "s" : ""}`;
+        }
+        return `${days} days`;
     }
 
     destroy() {

@@ -75,8 +75,7 @@ class AverageDistanceChart {
                 metricKey: "avgPace",
                 metricColor: "rgba(251, 188, 4, 1)",
                 metricBgColor: "rgba(251, 188, 4, 0.1)",
-                metricFormatter: (value) =>
-                    window.helpers.formatSwimPace(value),
+                metricFormatter: (value) => `${value.toFixed(2)}min/km`,
                 metricAxisLabel: "Pace (min/100m)",
                 zones: ["z1", "z2", "z3", "z4", "z5"],
                 zoneLabels: [
@@ -127,7 +126,7 @@ class AverageDistanceChart {
         // Add average line
         datasets.push({
             type: "line",
-            label: `Ã˜ ${monthsToShow} Month${monthsToShow !== 1 ? "s" : ""}`,
+            label: `Ø ${monthsToShow} Month${monthsToShow !== 1 ? "s" : ""}`,
             data: Array(labels.length).fill(avgWeekly),
             borderColor: "rgba(138, 180, 248, 1)",
             borderWidth: 2,

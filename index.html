@@ -635,8 +635,12 @@
               <div class="value" id="restDays">—</div>
             </div>
           </div>
-          <div id="runTrainingLoadAnalysis"></div>
         </div>
+
+        <div class="panel">
+            <h2>Training Load Analysis</h2>
+            <div id="runTrainingLoadAnalysis"></div>
+          </div>
 
         <!-- Average Weekly Distance Chart -->
         <div class="panel">
@@ -657,48 +661,48 @@
         </div>
       </div>
 
-      <!-- Ride Analysis (hidden by default) -->
-      <div id="analysis-ride" class="sport-analysis-content" style="display: none;">
-        <div class="panel">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h2 style="margin: 0;">Overview - Cycling</h2>
+        <!-- Ride Analysis (hidden by default) -->
+        <div id="analysis-ride" class="sport-analysis-content" style="display: none;">
+          <div class="panel">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+              <h2 style="margin: 0;">Overview - Cycling</h2>
+            </div>
+            <div class="stats">
+              <div class="stat">
+                <div class="label">Rides - Last 7 Days</div>
+                <div class="value" id="ridesWeek">—</div>
+              </div>
+              <div class="stat">
+                <div class="label">Distance - Last 7 Days</div>
+                <div class="value" id="rideDistanceWeek">—</div>
+              </div>
+              <div class="stat">
+                <div class="label">Weekly km - Last 6 months</div>
+                <div class="value" id="avgWeeklyRide">—</div>
+              </div>
+              <div class="stat">
+                <div class="label">Days Since Rest Day</div>
+                <div class="value" id="restDaysRide">—</div>
+              </div>
+            </div>
           </div>
-          <div class="stats">
-            <div class="stat">
-              <div class="label">Rides - Last 7 Days</div>
-              <div class="value" id="ridesWeek">—</div>
-            </div>
-            <div class="stat">
-              <div class="label">Distance - Last 7 Days</div>
-              <div class="value" id="rideDistanceWeek">—</div>
-            </div>
-            <div class="stat">
-              <div class="label">Weekly km - Last 6 months</div>
-              <div class="value" id="avgWeeklyRide">—</div>
-            </div>
-            <div class="stat">
-              <div class="label">Days Since Rest Day</div>
-              <div class="value" id="restDaysRide">—</div>
-            </div>
+          <div class="panel">
+            <h2>Training Load Analysis</h2>
+            <div id="rideTrainingLoadAnalysis"></div>
           </div>
-          <div id="rideTrainingLoadAnalysis"></div>
+          <div class="panel">
+            <h2>Average Weekly Distance (Last 6 Months)</h2>
+            <canvas id="averageDistanceChartRide"></canvas>
+          </div>
+          <div class="panel">
+            <h2>Intensity (Last 4 Weeks)</h2>
+            <canvas id="intensityChartRide" minwidth="800" minheight="400"></canvas>
+          </div>
+          <div class="panel">
+            <h2>Rides of Previous Four Weeks</h2>
+            <div id="timelineRide" class="timeline"></div>
+          </div>
         </div>
-
-        <div class="panel">
-          <h2>Average Weekly Distance (Last 6 Months)</h2>
-          <canvas id="averageDistanceChartRide"></canvas>
-        </div>
-
-        <div class="panel">
-          <h2>Intensity (Last 4 Weeks)</h2>
-          <canvas id="intensityChartRide" minwidth="800" minheight="400"></canvas>
-        </div>
-
-        <div class="panel">
-          <h2>Rides of Previous Four Weeks</h2>
-          <div id="timelineRide" class="timeline"></div>
-        </div>
-      </div>
 
       <!-- Swim Analysis (hidden by default) -->
       <div id="analysis-swim" class="sport-analysis-content" style="display: none;">
@@ -724,8 +728,12 @@
               <div class="value" id="restDaysSwim">—</div>
             </div>
           </div>
-          <div id="swimTrainingLoadAnalysis"></div>
         </div>
+
+          <div class="panel">
+            <h2>Training Load Analysis</h2>
+            <div id="swimTrainingLoadAnalysis"></div>
+          </div>
 
         <div class="panel">
           <h2>Average Weekly Distance (Last 6 Months)</h2>
