@@ -1,16 +1,159 @@
 class AverageDistanceChart {
     constructor() {
         this.chart = null;
+        this.currentPeriod = 90; // Default to 3 months (in days), -1 means "all time"
+        this.cachedActivities = null;
+        this.cachedAvgWeekly = null;
+        this.periodPresets = [
+            { label: "1 Month", days: 30 },
+            { label: "2 Months", days: 60 },
+            { label: "3 Months", days: 90 },
+            { label: "6 Months", days: 180 },
+            { label: "1 Year", days: 365 },
+            { label: "All Time", days: -1 },
+        ];
+    }
+
+    // Create period selector buttons
+    createPeriodSelector(sportType = "ride") {
+        const containerId = `avgDistPeriodSelector${sportType.charAt(0).toUpperCase() + sportType.slice(1)}`;
+        let container = document.getElementById(containerId);
+
+        if (!container) {
+            const canvas = document.getElementById(
+                `averageDistanceChart${sportType.charAt(0).toUpperCase() + sportType.slice(1)}`
+            );
+            if (!canvas) return;
+
+            container = document.createElement("div");
+            container.id = containerId;
+            container.style.cssText =
+                "display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; justify-content: center; align-items: center;";
+            canvas.parentNode.insertBefore(container, canvas);
+        }
+
+        container.innerHTML = "";
+        const isPreset = this.periodPresets.some(
+            (p) => p.days === this.currentPeriod
+        );
+
+        this.periodPresets.forEach((preset) => {
+            const button = document.createElement("button");
+            button.textContent = preset.label;
+            button.style.cssText = `padding: 8px 16px; border: 1px solid #5f6368; border-radius: 4px; background: ${this.currentPeriod === preset.days ? "#4285f4" : "transparent"}; color: ${this.currentPeriod === preset.days ? "#fff" : "#e8eaed"}; cursor: pointer; font-size: 13px; font-family: system-ui, -apple-system, sans-serif; transition: all 0.2s;`;
+
+            button.addEventListener("mouseenter", () => {
+                if (this.currentPeriod !== preset.days)
+                    button.style.background = "rgba(66, 133, 244, 0.1)";
+            });
+            button.addEventListener("mouseleave", () => {
+                if (this.currentPeriod !== preset.days)
+                    button.style.background = "transparent";
+            });
+            button.addEventListener("click", () => {
+                this.currentPeriod = preset.days;
+                this.renderChartWithCachedData(sportType);
+                this.createPeriodSelector(sportType);
+            });
+            container.appendChild(button);
+        });
+
+        // Custom input
+        const customWrapper = document.createElement("div");
+        customWrapper.style.cssText =
+            "display: flex; gap: 4px; align-items: center;";
+
+        const customLabel = document.createElement("span");
+        customLabel.textContent = "Custom:";
+        customLabel.style.cssText =
+            "color: #e8eaed; font-size: 13px; font-family: system-ui, -apple-system, sans-serif;";
+
+        const customInput = document.createElement("input");
+        customInput.type = "number";
+        customInput.min = "1";
+        customInput.max = "730";
+        customInput.placeholder = "Days";
+        customInput.style.cssText = `width: 70px; padding: 8px 12px; border: 1px solid #5f6368; border-radius: 4px; background: ${!isPreset ? "#4285f4" : "transparent"}; color: #e8eaed; font-size: 13px; font-family: system-ui, -apple-system, sans-serif; text-align: center;`;
+        if (!isPreset) customInput.value = this.currentPeriod;
+
+        const daysLabel = document.createElement("span");
+        daysLabel.textContent = "days";
+        daysLabel.style.cssText =
+            "color: #e8eaed; font-size: 13px; font-family: system-ui, -apple-system, sans-serif;";
+
+        const applyButton = document.createElement("button");
+        applyButton.textContent = "Apply";
+        applyButton.style.cssText =
+            "padding: 8px 16px; border: 1px solid #5f6368; border-radius: 4px; background: transparent; color: #e8eaed; cursor: pointer; font-size: 13px; font-family: system-ui, -apple-system, sans-serif; transition: all 0.2s;";
+
+        applyButton.addEventListener(
+            "mouseenter",
+            () => (applyButton.style.background = "rgba(66, 133, 244, 0.1)")
+        );
+        applyButton.addEventListener(
+            "mouseleave",
+            () => (applyButton.style.background = "transparent")
+        );
+
+        const applyCustomPeriod = () => {
+            const days = parseInt(customInput.value);
+            if (days && days > 0 && days <= 730) {
+                this.currentPeriod = days;
+                this.renderChartWithCachedData(sportType);
+                this.createPeriodSelector(sportType);
+            } else {
+                customInput.style.borderColor = "#ea4335";
+                setTimeout(
+                    () => (customInput.style.borderColor = "#5f6368"),
+                    1000
+                );
+            }
+        };
+
+        applyButton.addEventListener("click", applyCustomPeriod);
+        customInput.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") applyCustomPeriod();
+        });
+
+        customWrapper.appendChild(customLabel);
+        customWrapper.appendChild(customInput);
+        customWrapper.appendChild(daysLabel);
+        customWrapper.appendChild(applyButton);
+        container.appendChild(customWrapper);
+    }
+
+    renderChartWithCachedData(sportType) {
+        if (this.cachedActivities) {
+            this.renderChart(
+                this.cachedActivities,
+                this.cachedAvgWeekly,
+                sportType
+            );
+        }
     }
 
     renderChart(activities, avgWeekly, sportType = "ride") {
-        const chartSettings = window.settingsManager.getChartRanges();
-        const monthsToShow = chartSettings.distanceChartMonths;
+        // Cache data for re-rendering
+        if (activities !== null && activities !== undefined) {
+            this.cachedActivities = activities;
+            this.cachedAvgWeekly = avgWeekly;
+        }
 
-        const rangeStart = new Date();
-        rangeStart.setMonth(rangeStart.getMonth() - monthsToShow);
+        // Create period selector
+        this.createPeriodSelector(sportType);
 
-        const recent = (activities || []).filter((a) => a.date >= rangeStart);
+        let recent;
+        if (this.currentPeriod === -1) {
+            // All time - use all activities
+            recent = this.cachedActivities || [];
+        } else {
+            // Specific period - filter by date range
+            const rangeStart = new Date();
+            rangeStart.setDate(rangeStart.getDate() - this.currentPeriod);
+            recent = (this.cachedActivities || []).filter(
+                (a) => a.date >= rangeStart
+            );
+        }
 
         // Determine the appropriate method and renderer based on sport type
         const methodMap = {
@@ -123,11 +266,14 @@ class AverageDistanceChart {
             yAxisID: "y",
         }));
 
+        // Get period label for display
+        const periodLabel = this.getPeriodLabel(this.currentPeriod);
+
         // Add average line
         datasets.push({
             type: "line",
-            label: `Ø ${monthsToShow} Month${monthsToShow !== 1 ? "s" : ""}`,
-            data: Array(labels.length).fill(avgWeekly),
+            label: `Ã˜ ${periodLabel}`,
+            data: Array(labels.length).fill(this.cachedAvgWeekly),
             borderColor: "rgba(138, 180, 248, 1)",
             borderWidth: 2,
             borderDash: [5, 5],
@@ -137,7 +283,6 @@ class AverageDistanceChart {
         });
 
         // Add metric line (FTP or pace)
-
         const metricValues = weeklyData
             .map((w) => w[config.metricKey])
             .filter((v) => v !== null && v !== undefined && !Number.isNaN(v));
@@ -261,6 +406,27 @@ class AverageDistanceChart {
                 },
             },
         });
+    }
+
+    // Helper to get human-readable period label
+    getPeriodLabel(days) {
+        if (days === -1) return "All Time";
+        if (days === 30) return "1 Month";
+        if (days === 60) return "2 Months";
+        if (days === 90) return "3 Months";
+        if (days === 180) return "6 Months";
+        if (days === 365) return "1 Year";
+
+        // Fallback for custom periods
+        if (days >= 365) {
+            const years = (days / 365).toFixed(1);
+            return `${years} Year${years !== "1.0" ? "s" : ""}`;
+        }
+        if (days >= 30) {
+            const months = Math.round(days / 30);
+            return `${months} Month${months !== 1 ? "s" : ""}`;
+        }
+        return `${days} Days`;
     }
 
     destroy() {

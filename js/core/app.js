@@ -68,7 +68,9 @@ class TriRunalyzer {
 
         if (totalActivities > 0) {
             window.feedbackManager.showSessionBanner(totalActivities, "zip");
-            this.analyze("all");
+            this.analyze(
+                window.location.hash.substring(1).replace("page-analysis-", "")
+            );
         }
 
         // Setup navigation
@@ -203,15 +205,26 @@ class TriRunalyzer {
         console.log(`📊 Analyzing ${targetSport} data...`);
 
         try {
-            if (targetSport === "all") {
+            if (
+                targetSport === "run" ||
+                window.location.hash
+                    .substring(1)
+                    .replace("page-analysis-", "") === "run"
+            ) {
                 this.analyzeRuns();
+            } else if (
+                targetSport === "ride" ||
+                window.location.hash
+                    .substring(1)
+                    .replace("page-analysis-", "") === "ride"
+            ) {
                 this.analyzeRides();
-                this.analyzeSwims();
-            } else if (targetSport === "run") {
-                this.analyzeRuns();
-            } else if (targetSport === "ride") {
-                this.analyzeRides();
-            } else if (targetSport === "swim") {
+            } else if (
+                targetSport === "swim" ||
+                window.location.hash
+                    .substring(1)
+                    .replace("page-analysis-", "") === "swim"
+            ) {
                 this.analyzeSwims();
             }
             window.DashboardRenderer.render();
@@ -379,7 +392,7 @@ function initializeChartToggles(sportType) {
     const toggleTitle = document.createElement("div");
     toggleTitle.textContent = "Show Charts:";
     toggleTitle.style.cssText =
-        "font-weight: 600; margin-bottom: 0.5rem; color: #374151;";
+        "font-weight: 600; margin-bottom: 0.5rem; color: var(--text);";
 
     const checkboxContainer = document.createElement("div");
     checkboxContainer.style.cssText =
@@ -454,7 +467,69 @@ function initializeChartToggles(sportType) {
             }
 
             if (element) {
-                element.style.display = chartStates[chart.id] ? "" : "none";
+                // Add transition styles if not already present
+                if (!element.style.transition) {
+                    element.style.transition =
+                        "max-height 0.4s ease-in-out, opacity 0.4s ease-in-out, margin 0.4s ease-in-out, padding 0.4s ease-in-out";
+                    element.style.overflow = "hidden";
+                }
+
+                if (chartStates[chart.id]) {
+                    // Show the panel
+                    element.style.display = "";
+
+                    // Get the actual height
+                    const height = element.scrollHeight;
+
+                    // Start from collapsed state
+                    element.style.maxHeight = "0px";
+                    element.style.opacity = "0";
+                    element.style.marginBottom = "0";
+                    element.style.paddingTop = "0";
+                    element.style.paddingBottom = "0";
+
+                    // Trigger reflow
+                    element.offsetHeight;
+
+                    // Animate to full height
+                    requestAnimationFrame(() => {
+                        element.style.maxHeight = height + "px";
+                        element.style.opacity = "1";
+                        element.style.marginBottom = "";
+                        element.style.paddingTop = "";
+                        element.style.paddingBottom = "";
+                    });
+
+                    // Remove max-height after animation to allow dynamic resizing
+                    setTimeout(() => {
+                        if (chartStates[chart.id]) {
+                            element.style.maxHeight = "none";
+                        }
+                    }, 400);
+                } else {
+                    // Get current height before collapsing
+                    const height = element.scrollHeight;
+                    element.style.maxHeight = height + "px";
+
+                    // Trigger reflow
+                    element.offsetHeight;
+
+                    // Collapse the panel
+                    requestAnimationFrame(() => {
+                        element.style.maxHeight = "0px";
+                        element.style.opacity = "0";
+                        element.style.marginBottom = "0";
+                        element.style.paddingTop = "0";
+                        element.style.paddingBottom = "0";
+                    });
+
+                    // Hide completely after animation
+                    setTimeout(() => {
+                        if (!chartStates[chart.id]) {
+                            element.style.display = "none";
+                        }
+                    }, 400);
+                }
             }
         });
 

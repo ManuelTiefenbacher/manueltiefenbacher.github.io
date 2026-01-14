@@ -139,7 +139,6 @@ function initSidebar() {
     });
 }
 
-// MOVED OUTSIDE initSidebar - now globally accessible
 function switchSportType(sport) {
     console.log("Switching to sport:", sport);
 
@@ -167,19 +166,18 @@ function switchSportType(sport) {
         activeBtn.classList.add("active");
     }
 
-    // Update sidebar active state
-    document.querySelectorAll(".nav-item[data-sport]").forEach((nav) => {
-        nav.classList.remove("active");
-    });
+    // Update sidebar active state - ONLY for analysis nav items
+    document
+        .querySelectorAll(".nav-item[data-page='page-analysis']")
+        .forEach((nav) => {
+            nav.classList.remove("active");
+        });
     const activeSidebarItem = document.querySelector(
-        `.nav-item[data-sport="${sport}"]`
+        `.nav-item[data-page='page-analysis'][data-sport="${sport}"]`
     );
     if (activeSidebarItem) {
         activeSidebarItem.classList.add("active");
     }
-
-    // DON'T save to sessionStorage anymore
-    // sessionStorage.setItem("lastVisitedSport", sport);
 }
 
 function openMobileSidebar() {
@@ -220,18 +218,32 @@ function navigateToPageWithHash(pageId, sport) {
         console.error("Page not found:", pageId);
     }
 
-    // Update active nav item
+    // Update active nav item - CLEAR ALL FIRST
     const navItems = document.querySelectorAll(".nav-item");
     navItems.forEach((item) => {
-        if (item.getAttribute("data-page") === pageId) {
-            item.classList.add("active");
-        } else {
-            item.classList.remove("active");
-        }
+        item.classList.remove("active");
     });
 
+    // Then set active based on page and sport
+    if (pageId === "page-analysis" && sport) {
+        // For analysis pages, activate the specific sport nav item
+        const sportNavItem = document.querySelector(
+            `.nav-item[data-page="${pageId}"][data-sport="${sport}"]`
+        );
+        if (sportNavItem) {
+            sportNavItem.classList.add("active");
+        }
+    } else {
+        // For other pages, activate by page ID only
+        const activeNavItem = document.querySelector(
+            `.nav-item[data-page="${pageId}"]`
+        );
+        if (activeNavItem) {
+            activeNavItem.classList.add("active");
+        }
+    }
+
     // Update URL hash to preserve state on reload
-    // For analysis page, include sport in hash
     if (pageId === "page-analysis" && sport) {
         window.location.hash = `${pageId}-${sport}`;
     } else {

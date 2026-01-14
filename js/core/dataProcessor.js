@@ -39,7 +39,6 @@ class DataProcessor {
         console.log(
             `📊 Total unique runs: ${this.runs.length} (added ${newRuns.length} from ${source})`
         );
-        console.log(this.runs);
         return this.runs;
     }
 
@@ -64,7 +63,6 @@ class DataProcessor {
         console.log(
             `📊 Total unique rides: ${this.rides.length} (added ${newRides.length} from ${source})`
         );
-        console.log(this.rides);
         return this.rides;
     }
 
