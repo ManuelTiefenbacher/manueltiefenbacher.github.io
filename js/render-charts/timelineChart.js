@@ -13,7 +13,7 @@ class TimelineChart {
         ];
     }
 
-    // Create period selector buttons
+    // Create period selector with dropdown
     createPeriodSelector(sportType = "ride") {
         const containerId = `timelinePeriodSelector${sportType.charAt(0).toUpperCase() + sportType.slice(1)}`;
         let container = document.getElementById(containerId);
@@ -26,79 +26,59 @@ class TimelineChart {
 
             container = document.createElement("div");
             container.id = containerId;
+            container.className = "timeline-period-selector";
             container.style.cssText =
                 "display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; justify-content: center; align-items: center;";
             timeline.parentNode.insertBefore(container, timeline);
         }
 
         container.innerHTML = "";
+
+        // Check if current period is a preset
         const isPreset = this.periodPresets.some(
             (p) => p.days === this.currentPeriod
         );
 
+        // Create dropdown
+        const dropdown = document.createElement("select");
+        dropdown.style.cssText = `
+            padding: 8px 12px;
+            border: 1px solid #5f6368;
+            border-radius: 4px;
+            background: #202124;
+            color: #e8eaed;
+            cursor: pointer;
+            font-size: 13px;
+            font-family: system-ui, -apple-system, sans-serif;
+            min-width: 120px;
+        `;
+
+        // Add preset options
         this.periodPresets.forEach((preset) => {
-            const button = document.createElement("button");
-            button.textContent = preset.label;
-            button.style.cssText = `padding: 8px 16px; border: 1px solid #5f6368; border-radius: 4px; background: ${this.currentPeriod === preset.days ? "#4285f4" : "transparent"}; color: ${this.currentPeriod === preset.days ? "#fff" : "#e8eaed"}; cursor: pointer; font-size: 13px; font-family: system-ui, -apple-system, sans-serif; transition: all 0.2s;`;
-
-            button.addEventListener("mouseenter", () => {
-                if (this.currentPeriod !== preset.days)
-                    button.style.background = "rgba(66, 133, 244, 0.1)";
-            });
-            button.addEventListener("mouseleave", () => {
-                if (this.currentPeriod !== preset.days)
-                    button.style.background = "transparent";
-            });
-            button.addEventListener("click", () => {
-                this.currentPeriod = preset.days;
-                // Don't call createPeriodSelector here to avoid infinite loop
-                // Just re-render with the new period
-                const canvasId = `timeline${sportType.charAt(0).toUpperCase() + sportType.slice(1)}`;
-                const canvas = document.getElementById(canvasId);
-                if (!canvas) return;
-
-                canvas.innerHTML = "";
-                const recent = (this.cachedActivities || []).filter(
-                    (a) => window.helpers.daysAgo(a.date) <= this.currentPeriod
-                );
-                const sorted = [...recent].sort((a, b) => b.date - a.date);
-
-                const methodMap = {
-                    ride: {
-                        classifier: "classifyRide",
-                        renderer: window.runClassifier,
-                    },
-                    run: {
-                        classifier: "classifyRun",
-                        renderer: window.runClassifier,
-                    },
-                    swim: {
-                        classifier: "classifySwim",
-                        renderer: window.runClassifier,
-                    },
-                };
-
-                const methods = methodMap[sportType.toLowerCase()];
-                if (methods) {
-                    sorted.forEach((activity) => {
-                        const classification =
-                            methods.renderer[methods.classifier](activity);
-                        const el = this.createElement(
-                            activity,
-                            classification,
-                            sportType
-                        );
-                        canvas.appendChild(el);
-                    });
-                }
-
-                // Update button states
-                this.createPeriodSelector(sportType);
-            });
-            container.appendChild(button);
+            const option = document.createElement("option");
+            option.value = preset.days;
+            option.textContent = preset.label;
+            option.selected = this.currentPeriod === preset.days;
+            dropdown.appendChild(option);
         });
 
-        // Custom input
+        // Add custom option if current period is not a preset
+        if (!isPreset) {
+            const customOption = document.createElement("option");
+            customOption.value = this.currentPeriod;
+            customOption.textContent = `Custom (${this.currentPeriod} days)`;
+            customOption.selected = true;
+            dropdown.appendChild(customOption);
+        }
+
+        dropdown.addEventListener("change", (e) => {
+            this.currentPeriod = parseInt(e.target.value);
+            this.renderTimelineActivities(sportType);
+        });
+
+        container.appendChild(dropdown);
+
+        // Add custom input field
         const customWrapper = document.createElement("div");
         customWrapper.style.cssText =
             "display: flex; gap: 4px; align-items: center;";
@@ -113,7 +93,8 @@ class TimelineChart {
         customInput.min = "1";
         customInput.max = "365";
         customInput.placeholder = "Days";
-        customInput.style.cssText = `width: 70px; padding: 8px 12px; border: 1px solid #5f6368; border-radius: 4px; background: ${!isPreset ? "#4285f4" : "transparent"}; color: #e8eaed; font-size: 13px; font-family: system-ui, -apple-system, sans-serif; text-align: center;`;
+        customInput.style.cssText =
+            "width: 70px; padding: 8px 12px; border: 1px solid #5f6368; border-radius: 4px; background: transparent; color: #e8eaed; font-size: 13px; font-family: system-ui, -apple-system, sans-serif; text-align: center;";
         if (!isPreset) customInput.value = this.currentPeriod;
 
         const daysLabel = document.createElement("span");
@@ -139,49 +120,8 @@ class TimelineChart {
             const days = parseInt(customInput.value);
             if (days && days > 0 && days <= 365) {
                 this.currentPeriod = days;
-
-                // Re-render activities with new period
-                const canvasId = `timeline${sportType.charAt(0).toUpperCase() + sportType.slice(1)}`;
-                const canvas = document.getElementById(canvasId);
-                if (!canvas) return;
-
-                canvas.innerHTML = "";
-                const recent = (this.cachedActivities || []).filter(
-                    (a) => window.helpers.daysAgo(a.date) <= this.currentPeriod
-                );
-                const sorted = [...recent].sort((a, b) => b.date - a.date);
-
-                const methodMap = {
-                    ride: {
-                        classifier: "classifyRide",
-                        renderer: window.runClassifier,
-                    },
-                    run: {
-                        classifier: "classifyRun",
-                        renderer: window.runClassifier,
-                    },
-                    swim: {
-                        classifier: "classifySwim",
-                        renderer: window.runClassifier,
-                    },
-                };
-
-                const methods = methodMap[sportType.toLowerCase()];
-                if (methods) {
-                    sorted.forEach((activity) => {
-                        const classification =
-                            methods.renderer[methods.classifier](activity);
-                        const el = this.createElement(
-                            activity,
-                            classification,
-                            sportType
-                        );
-                        canvas.appendChild(el);
-                    });
-                }
-
-                // Update button states
                 this.createPeriodSelector(sportType);
+                this.renderTimelineActivities(sportType);
             } else {
                 customInput.style.borderColor = "#ea4335";
                 setTimeout(
@@ -201,6 +141,45 @@ class TimelineChart {
         customWrapper.appendChild(daysLabel);
         customWrapper.appendChild(applyButton);
         container.appendChild(customWrapper);
+    }
+
+    // Helper method to render activities without full re-initialization
+    renderTimelineActivities(sportType) {
+        const canvasId = `timeline${sportType.charAt(0).toUpperCase() + sportType.slice(1)}`;
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+
+        canvas.innerHTML = "";
+        const recent = (this.cachedActivities || []).filter(
+            (a) => window.helpers.daysAgo(a.date) <= this.currentPeriod
+        );
+        const sorted = [...recent].sort((a, b) => b.date - a.date);
+
+        const methodMap = {
+            ride: {
+                classifier: "classifyRide",
+                renderer: window.runClassifier,
+            },
+            run: { classifier: "classifyRun", renderer: window.runClassifier },
+            swim: {
+                classifier: "classifySwim",
+                renderer: window.runClassifier,
+            },
+        };
+
+        const methods = methodMap[sportType.toLowerCase()];
+        if (methods) {
+            sorted.forEach((activity) => {
+                const classification =
+                    methods.renderer[methods.classifier](activity);
+                const el = this.createElement(
+                    activity,
+                    classification,
+                    sportType
+                );
+                canvas.appendChild(el);
+            });
+        }
     }
 
     renderChart(activities, sportType = "ride") {

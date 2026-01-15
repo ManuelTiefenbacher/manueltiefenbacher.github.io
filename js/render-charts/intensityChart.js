@@ -12,13 +12,12 @@ class IntensityChart {
         ];
     }
 
-    // Create period selector buttons
+    // Create period selector with dropdown
     createPeriodSelector(sportType = "ride") {
         const containerId = `periodSelector${sportType.charAt(0).toUpperCase() + sportType.slice(1)}`;
         let container = document.getElementById(containerId);
 
         if (!container) {
-            // Create container if it doesn't exist
             const chartCanvas = document.getElementById(
                 `intensityChart${sportType.charAt(0).toUpperCase() + sportType.slice(1)}`
             );
@@ -40,42 +39,44 @@ class IntensityChart {
             (p) => p.days === this.currentPeriod
         );
 
+        // Create dropdown
+        const dropdown = document.createElement("select");
+        dropdown.style.cssText = `
+            padding: 8px 12px;
+            border: 1px solid #5f6368;
+            border-radius: 4px;
+            background: #202124;
+            color: #e8eaed;
+            cursor: pointer;
+            font-size: 13px;
+            font-family: system-ui, -apple-system, sans-serif;
+            min-width: 120px;
+        `;
+
+        // Add preset options
         this.periodPresets.forEach((preset) => {
-            const button = document.createElement("button");
-            button.textContent = preset.label;
-            button.className = "period-button";
-            button.style.cssText = `
-                padding: 8px 16px;
-                border: 1px solid #5f6368;
-                border-radius: 4px;
-                background: ${this.currentPeriod === preset.days ? "#4285f4" : "transparent"};
-                color: ${this.currentPeriod === preset.days ? "#fff" : "#e8eaed"};
-                cursor: pointer;
-                font-size: 13px;
-                font-family: system-ui, -apple-system, sans-serif;
-                transition: all 0.2s;
-            `;
-
-            button.addEventListener("mouseenter", () => {
-                if (this.currentPeriod !== preset.days) {
-                    button.style.background = "rgba(66, 133, 244, 0.1)";
-                }
-            });
-
-            button.addEventListener("mouseleave", () => {
-                if (this.currentPeriod !== preset.days) {
-                    button.style.background = "transparent";
-                }
-            });
-
-            button.addEventListener("click", () => {
-                this.currentPeriod = preset.days;
-                this.createPeriodSelector(sportType); // Refresh buttons
-                this.renderChart(null, sportType); // Re-render chart
-            });
-
-            container.appendChild(button);
+            const option = document.createElement("option");
+            option.value = preset.days;
+            option.textContent = preset.label;
+            option.selected = this.currentPeriod === preset.days;
+            dropdown.appendChild(option);
         });
+
+        // Add custom option if current period is not a preset
+        if (!isPreset) {
+            const customOption = document.createElement("option");
+            customOption.value = this.currentPeriod;
+            customOption.textContent = `Custom (${this.currentPeriod} days)`;
+            customOption.selected = true;
+            dropdown.appendChild(customOption);
+        }
+
+        dropdown.addEventListener("change", (e) => {
+            this.currentPeriod = parseInt(e.target.value);
+            this.renderChart(null, sportType);
+        });
+
+        container.appendChild(dropdown);
 
         // Add custom input field
         const customWrapper = document.createElement("div");
@@ -100,7 +101,7 @@ class IntensityChart {
             padding: 8px 12px;
             border: 1px solid #5f6368;
             border-radius: 4px;
-            background: ${!isPreset ? "#4285f4" : "transparent"};
+            background: transparent;
             color: #e8eaed;
             font-size: 13px;
             font-family: system-ui, -apple-system, sans-serif;
@@ -112,6 +113,7 @@ class IntensityChart {
         }
 
         const daysLabel = document.createElement("span");
+        daysLabel.textContent = "days";
         daysLabel.style.cssText = `
             color: #e8eaed;
             font-size: 13px;

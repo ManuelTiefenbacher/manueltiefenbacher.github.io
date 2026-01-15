@@ -605,7 +605,10 @@
     <!-- Page: Analysis -->
     <div id="page-analysis" class="content-page">
       <div class="page-header">
-        <h1>Training Analysis</h1>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h1>Training Analysis</h1>
+            <button id="comparePeriodsBtn" onclick="navigateToPage('page-comparison')">📊 Compare Periods</button>
+        </div>
         <p>View your training metrics and progress</p>
       </div>
 
@@ -615,7 +618,6 @@
         <div class="panel">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h2 style="margin: 0;">Overview - Running</h2>
-            <button id="comparePeriodsBtn" onclick="navigateToPage('page-comparison')">📊 Compare Periods</button>
           </div>
           <div class="stats">
             <div class="stat">
